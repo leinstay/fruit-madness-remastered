@@ -13,8 +13,9 @@ import { createStarfield } from './starfield.js';
 import { createExplosion } from './explosion.js';
 import {
   drawHud, drawButtons, drawWarnings, drawTelegraphs, drawPaused, drawWorldSprites,
-  spriteRect, rectHit, BTN_PAUSE, BTN_MENU,
+  buttonRect, rectHit, BTN_PAUSE, BTN_MENU,
 } from './game-hud.js';
+import { drawJoystick } from './joystick-view.js';
 
 // How long the wreck burns before the score screen takes over.
 const DEATH_FRAMES = 90;
@@ -61,9 +62,9 @@ export function createGameScene() {
   function handleButtons(input) {
     if (!input || !input.pointer.clicked || !app || !app.assets) return false;
     const p = input.pointer;
-    if (rectHit(spriteRect(app.assets, 'btnPause', BTN_PAUSE.x, BTN_PAUSE.y), p)) {
+    if (rectHit(buttonRect(app.assets, 'btnPause', BTN_PAUSE), p)) {
       if (!dying) setPaused(!paused);
-    } else if (rectHit(spriteRect(app.assets, 'btnMenu', BTN_MENU.x, BTN_MENU.y), p)) {
+    } else if (rectHit(buttonRect(app.assets, 'btnMenu', BTN_MENU), p)) {
       app.go('menu');
       return true;
     }
@@ -137,6 +138,8 @@ export function createGameScene() {
     drawWarnings(c, assets, world.warnings, world.frame);
     drawHud(c, assets, { fuel, score, combo, frame: world.frame });
     drawButtons(c, assets);
+    // The floating stick, only ever visible while a finger is actually holding it.
+    if (app.input) drawJoystick(c, app.input.joystick);
     if (paused) drawPaused(c);
   }
 
@@ -144,12 +147,23 @@ export function createGameScene() {
     enter(theApp) {
       app = theApp;
       reset();
+      // A thumb landing on PAUSE or MENU presses the button instead of starting to steer.
+      if (app.input && app.assets) {
+        app.input.setTouchExclusions([
+          buttonRect(app.assets, 'btnPause', BTN_PAUSE),
+          buttonRect(app.assets, 'btnMenu', BTN_MENU),
+        ]);
+      }
       // Same track as the menu: coming from the title screen this is a no-op, while after
       // RETRY (the theme was stopped on death) it starts again from the beginning.
       if (app.audio) { app.audio.resumeMusic(); app.audio.music('mainTheme'); }
     },
     update,
     render,
+    // The HUD buttons only exist in this scene, so the exclusions leave with it.
+    exit() {
+      if (app && app.input) app.input.setTouchExclusions([]);
+    },
     // Exposed for debugging from the console and for the browser check.
     get state() { return { world, player, fuel, combo, score, paused, dying }; },
   };

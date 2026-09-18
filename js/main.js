@@ -3,7 +3,7 @@ import { W, H, AUDIO_BASE_URL } from './config.js';
 import { createLoop } from './core/loop.js';
 import { loadAssets } from './core/assets.js';
 import { createAudio } from './core/audio.js';
-import { createInput } from './core/input.js';
+import { createInput, attachTouch } from './core/input.js';
 import { drawText, ensurePixelFont } from './core/text.js';
 import { createGameScene } from './scenes/game.js';
 import { createMenuScene } from './scenes/menu.js';
@@ -60,6 +60,9 @@ async function boot() {
   ctx.imageSmoothingEnabled = false;
 
   app.input = createInput(window, { canvas });
+  // The floating touch joystick writes the same four booleans the keyboard does, so both
+  // can be used at once and the ship's physics does not know the difference.
+  attachTouch(app.input, canvas);
   // The manifest is already in memory from loadAssets(); the file names in its `audio` map
   // are re-based onto AUDIO_BASE_URL, so moving the clips is a one-constant change.
   app.audio = createAudio(AUDIO_BASE_URL, (app.assets.manifest || {}).audio || {});

@@ -13,13 +13,33 @@ export const MARKER = '>';
 const COLOR_IDLE = '#ffffff';
 const COLOR_SELECTED = '#ffe14d';
 
+/**
+ * The smallest comfortable tap target, in logical canvas pixels. A finger is much blunter
+ * than a mouse, so every button gets a hit rectangle at least this tall — the drawn text is
+ * left exactly where it was and only the invisible rectangle around it grows.
+ */
+export const MIN_TOUCH_SIZE = 40;
+
+/** `rect` grown about its centre so that it is at least `min` px tall (and wide, optionally). */
+export function expandRect(rect, minH = MIN_TOUCH_SIZE, minW = 0) {
+  const h = Math.max(rect.h, minH);
+  const w = Math.max(rect.w, minW);
+  return {
+    x: rect.x - (w - rect.w) / 2,
+    y: rect.y - (h - rect.h) / 2,
+    w,
+    h,
+  };
+}
+
 /** Index of the first enabled item covering (x, y), or -1. Topmost item wins. */
 export function hitTest(items, x, y) {
   if (!Array.isArray(items)) return -1;
   for (let i = items.length - 1; i >= 0; i--) {
     const it = items[i];
     if (!it || it.disabled) continue;
-    if (x >= it.x && x <= it.x + it.w && y >= it.y && y <= it.y + it.h) return i;
+    const r = it.hit || it;
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i;
   }
   return -1;
 }
@@ -40,7 +60,12 @@ export function nextIndex(index, delta, count) {
  * `update(input)` returns the id activated this frame (click or Enter/Space), else null.
  */
 export function createButtons(defs) {
-  const items = defs.map((d) => ({ size: 20, align: 'center', ...d }));
+  // `hit` is the tap target; x/y/w/h stay the drawing rectangle, so nothing moves on screen.
+  const items = defs.map((d) => {
+    const item = { size: 20, align: 'center', ...d };
+    item.hit = item.hit || expandRect(item);
+    return item;
+  });
   let selected = 0;
   let lastX = null;
   let lastY = null;

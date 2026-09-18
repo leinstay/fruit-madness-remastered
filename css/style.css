@@ -4,24 +4,52 @@
   font-display: block;
 }
 
-html, body { margin: 0; height: 100%; background: #000; overflow: hidden; touch-action: none; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  touch-action: none;           /* no double-tap zoom, no panning */
+  overscroll-behavior: none;    /* no pull-to-refresh, no rubber-banding */
+  -webkit-text-size-adjust: 100%;
+}
 
+/* The playfield box: the visible viewport minus the notch / home-indicator insets. The
+   height is 100dvh where that exists (so the mobile URL bar does not cut the canvas off)
+   and plain 100vh everywhere else. Both the canvas and the nickname overlay are sized from
+   --canvas-w / --canvas-h, which is what keeps the HTML form aligned over the drawing. */
 #stage {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
+  --safe-w: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  --safe-h: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  --canvas-w: min(var(--safe-w), calc(var(--safe-h) * 4 / 3));
+  --canvas-h: calc(var(--canvas-w) * 3 / 4);
+  position: fixed;
+  inset: 0;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+           env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* 600x450 logical pixels, scaled to the largest 4:3 rectangle that fits the window */
+@supports (height: 100dvh) {
+  #stage { --safe-h: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+}
+
+/* 600x450 logical pixels, scaled to the largest 4:3 rectangle that fits the safe area:
+   in portrait that is the full width, centred vertically; in landscape the full height. */
 canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   display: block;
-  width: min(100vw, calc(100vh * 4 / 3));
-  height: min(100vh, calc(100vw * 3 / 4));
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+  touch-action: none;
 }
 
 /* The nickname overlay tracks the canvas box exactly (same size expressions, same centre),
@@ -33,8 +61,8 @@ canvas {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: min(100vw, calc(100vh * 4 / 3));
-  height: min(100vh, calc(100vw * 3 / 4));
+  width: var(--canvas-w);
+  height: var(--canvas-h);
   margin: 0;
   container-type: size;
   pointer-events: none;      /* only the field and the button take clicks */
@@ -48,6 +76,7 @@ canvas {
   position: absolute;
   top: 56.9%;                /* logical y 256 */
   height: 8%;                /* logical 36 px */
+  min-height: 26px;          /* still tall enough for the 16px minimum font below */
   box-sizing: border-box;
   pointer-events: auto;
   font-family: 'PixelFont', monospace;
@@ -63,7 +92,16 @@ canvas {
   appearance: none;
 }
 
-#nick-form input { left: 21%; width: 40%; }
+/* iOS zooms the page in whenever a focused field's text is smaller than 16 CSS pixels, and
+   on a phone 4.4cqh of the canvas is far less than that — hence the floor. The field also
+   keeps its own text selectable, unlike the rest of the stage. */
+#nick-form input {
+  left: 21%;
+  width: 40%;
+  font-size: max(16px, 4.4cqh);
+  user-select: text;
+  -webkit-user-select: text;
+}
 #nick-form button { left: 63.5%; width: 16%; text-align: center; cursor: pointer; padding: 0; }
 #nick-form button:hover:enabled { color: #ffe14d; border-color: #ffe14d; }
 #nick-form input:disabled, #nick-form button:disabled { opacity: 0.45; cursor: default; }
@@ -71,7 +109,9 @@ canvas {
 
 #nick-form #nick-error {
   position: absolute;
-  top: 65.5%;                /* logical y 295, just under the field */
+  /* Logical y 308: clear of the field even on a phone, where the 16px minimum font size
+     makes the field a little taller than its 8% share of a very short canvas. */
+  top: 68.5%;
   left: 21%;
   width: 58%;
   margin: 0;

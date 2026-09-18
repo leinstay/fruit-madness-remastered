@@ -5,6 +5,7 @@ import { W, H, FUEL, COMBO, ENEMY, SCORE_MAX } from '../config.js';
 import { drawSprite } from '../core/assets.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
+import { expandRect, MIN_TOUCH_SIZE } from './ui.js';
 
 // Positions of the original HUD (GameLoop.as); all three capsules sit on the same row.
 export const FUEL_BAR = { x: 57, y: 32 };
@@ -29,6 +30,15 @@ export function spriteRect(assets, name, x, y) {
 }
 
 export const rectHit = (r, p) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+
+/**
+ * The tap target of one of the two HUD buttons: the sprite rectangle grown to the minimum
+ * comfortable finger size. The same rectangle is handed to the touch joystick as an
+ * exclusion, so a thumb on PAUSE always presses PAUSE and never starts steering.
+ */
+export function buttonRect(assets, name, pos) {
+  return expandRect(spriteRect(assets, name, pos.x, pos.y), MIN_TOUCH_SIZE, MIN_TOUCH_SIZE);
+}
 
 /** Draws `name` scaled by `scale` about its anchor — used for the combo cells and for the
  *  cherry standing in for enemies whose own sprite has not been drawn yet (Task 15). */
