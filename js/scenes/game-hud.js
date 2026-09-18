@@ -46,15 +46,16 @@ function drawFuel(ctx, assets, fuelValue) {
   const img = assets.has('fuelFill') ? assets.img('fuelFill', 0) : null;
   if (img && img.width) {
     const a = assets.anchor('fuelFill') || [img.width / 2, img.height / 2];
-    const left = FUEL_BAR.x - a[0];
     const top = FUEL_BAR.y - a[1];
     const w = Math.round(img.width * ratio);
-    // The original scales the fill about its centre; the remake pins its left edge so the
-    // tank visibly empties from right to left.
+    // As in the 2013 original (`fuelCount.scaleX = fuel / 100`), the fill shrinks about its
+    // registration point, so the capsule contracts towards the middle of the bar.
+    const left = Math.round(FUEL_BAR.x - a[0] * ratio);
     if (w > 0) ctx.drawImage(img, left, top, w, img.height);
   } else {
+    const w = Math.round(100 * ratio);
     ctx.fillStyle = '#fff';
-    ctx.fillRect(FUEL_BAR.x - 50, FUEL_BAR.y - 15, Math.round(100 * ratio), 30);
+    ctx.fillRect(Math.round(FUEL_BAR.x - w / 2), FUEL_BAR.y - 15, w, 30);
   }
 }
 
