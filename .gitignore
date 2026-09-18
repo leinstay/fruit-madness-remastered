@@ -1,5 +1,10 @@
-# local reference recordings of the 2013 original
-fruit-madness-original*.mp4
+# notes and documentation are kept locally; only the README is published
+*.md
+!README.md
+docs/
+
+# video recordings
+*.mp4
 
 node_modules/
 .DS_Store
