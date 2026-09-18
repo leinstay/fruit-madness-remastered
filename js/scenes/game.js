@@ -38,11 +38,23 @@ export function createGameScene() {
     explosion = null;
   }
 
+  /** The pause button and the P/Escape key share this, so the music follows either one. */
+  function setPaused(value) {
+    paused = value;
+    if (!app.audio) return;
+    if (paused) app.audio.pauseMusic(); else app.audio.resumeMusic();
+  }
+
   function startDeath() {
     dying = true;
     deathFrames = 0;
     explosion = createExplosion(player.x, player.y);
-    // Task 12 adds sfx('boom') and stopMusic() here.
+    // As in the original: the theme cuts out, the wreck explodes, and the game-over jingle
+    // follows the blast. It plays once and is stopped when the score screen is left.
+    if (app.audio) {
+      app.audio.stopMusic();
+      app.audio.sfx('boom', { onEnded: () => app.audio.music('gameOver', { loop: false }) });
+    }
   }
 
   /** Returns true when the click left this scene, so update() must stop immediately. */
@@ -50,7 +62,7 @@ export function createGameScene() {
     if (!input || !input.pointer.clicked || !app || !app.assets) return false;
     const p = input.pointer;
     if (rectHit(spriteRect(app.assets, 'btnPause', BTN_PAUSE.x, BTN_PAUSE.y), p)) {
-      if (!dying) paused = !paused;
+      if (!dying) setPaused(!paused);
     } else if (rectHit(spriteRect(app.assets, 'btnMenu', BTN_MENU.x, BTN_MENU.y), p)) {
       app.go('menu');
       return true;
@@ -60,7 +72,7 @@ export function createGameScene() {
 
   function update(input) {
     if (handleButtons(input)) return;
-    if (input && (input.pressed('KeyP') || input.pressed('Escape')) && !dying) paused = !paused;
+    if (input && (input.pressed('KeyP') || input.pressed('Escape')) && !dying) setPaused(!paused);
     if (paused) return;
 
     // 1. the player and its tank (frozen once the ship is gone)
@@ -89,7 +101,7 @@ export function createGameScene() {
     for (let i = 0; i < taken; i++) {
       addFuel(fuel, FUEL.MUFFIN);
       score = Math.min(SCORE_MAX, score + comboCollect(combo));
-      // Task 12 adds sfx('pickup') here if the original has one.
+      // The original has no pickup sound, and no sound may be added that it did not have.
     }
 
     // 5. the per-frame score, multiplied by the combo
@@ -129,7 +141,13 @@ export function createGameScene() {
   }
 
   return {
-    enter(theApp) { app = theApp; reset(); },
+    enter(theApp) {
+      app = theApp;
+      reset();
+      // Same track as the menu: coming from the title screen this is a no-op, while after
+      // RETRY (the theme was stopped on death) it starts again from the beginning.
+      if (app.audio) { app.audio.resumeMusic(); app.audio.music('mainTheme'); }
+    },
     update,
     render,
     // Exposed for debugging from the console and for the browser check.

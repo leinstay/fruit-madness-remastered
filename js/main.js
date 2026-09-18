@@ -1,7 +1,8 @@
 // Entry point: assets, input, the fixed-step loop and the scene manager.
-import { W, H } from './config.js';
+import { W, H, AUDIO_BASE_URL } from './config.js';
 import { createLoop } from './core/loop.js';
 import { loadAssets } from './core/assets.js';
+import { createAudio } from './core/audio.js';
 import { createInput } from './core/input.js';
 import { drawText, ensurePixelFont } from './core/text.js';
 import { createGameScene } from './scenes/game.js';
@@ -59,6 +60,9 @@ async function boot() {
   ctx.imageSmoothingEnabled = false;
 
   app.input = createInput(window, { canvas });
+  // The manifest is already in memory from loadAssets(); the file names in its `audio` map
+  // are re-based onto AUDIO_BASE_URL, so moving the clips is a one-constant change.
+  app.audio = createAudio(AUDIO_BASE_URL, (app.assets.manifest || {}).audio || {});
 
   registerScene('menu', createMenuScene());
   registerScene('game', createGameScene());

@@ -150,6 +150,11 @@ export function createGameOverScene() {
     },
     update,
     render,
-    exit() { hideForm(); },
+    // Leaving the score screen silences it: the game-over jingle (or a boom still finishing)
+    // must not bleed into the menu or into the next run.
+    exit() {
+      hideForm();
+      if (app && app.audio) { app.audio.stopSfx(); app.audio.stopMusic(); }
+    },
   };
 }

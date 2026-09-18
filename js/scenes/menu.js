@@ -29,7 +29,11 @@ const BTN_SOUND = { id: 'sound', x: 504, y: 24, w: 92, h: 18, size: 12, marker: 
 
 const MUTED_KEY = 'fm.muted';
 
-/** localStorage is read lazily and defensively: it throws when site data is blocked. */
+/**
+ * localStorage is read lazily and defensively: it throws when site data is blocked.
+ * js/core/audio.js owns the same key; these two helpers are the fallback used when the
+ * audio service is missing (a scene rendered outside the normal boot).
+ */
 export function readMuted() {
   try {
     return globalThis.localStorage && globalThis.localStorage.getItem(MUTED_KEY) === '1';
@@ -57,9 +61,12 @@ export function createMenuScene() {
     else if (activated === 'board') app.go('leaderboard');
     else if (activated === 'sound') {
       muted = !muted;
-      writeMuted(muted);
-      // Task 12 hands this to createAudio().setMuted(); for now the flag is only stored.
-      if (app.audio && app.audio.setMuted) app.audio.setMuted(muted);
+      if (app.audio) {
+        app.audio.setMuted(muted);
+        muted = app.audio.muted;   // the service is the single source of truth
+      } else {
+        writeMuted(muted);
+      }
     }
   }
 
@@ -82,7 +89,7 @@ export function createMenuScene() {
 
     drawButton(c, buttons.byId('board'), buttons.isSelected('board'));
     drawButton(c, buttons.byId('sound'), buttons.isSelected('sound'), {
-      label: muted ? 'SOUND OFF' : 'SOUND ON',
+      label: (app.audio ? app.audio.muted : muted) ? 'SOUND OFF' : 'SOUND ON',
     });
   }
 
@@ -90,8 +97,11 @@ export function createMenuScene() {
     enter(theApp) {
       app = theApp;
       tick = 0;
-      muted = readMuted();
+      muted = app.audio ? app.audio.muted : readMuted();
       buttons.select('start');
+      // There is only one music track, and adding another is not allowed, so the title
+      // screen plays the same theme the game does; entering the game does not restart it.
+      if (app.audio) app.audio.music('mainTheme');
     },
     update,
     render,
