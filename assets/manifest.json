@@ -1,0 +1,230 @@
+{
+  "sprites": {
+    "ufo": {
+      "frames": [
+        "assets/sprites/ufo_0.png",
+        "assets/sprites/ufo_1.png",
+        "assets/sprites/ufo_2.png",
+        "assets/sprites/ufo_3.png",
+        "assets/sprites/ufo_4.png",
+        "assets/sprites/ufo_5.png",
+        "assets/sprites/ufo_6.png",
+        "assets/sprites/ufo_7.png",
+        "assets/sprites/ufo_8.png",
+        "assets/sprites/ufo_9.png",
+        "assets/sprites/ufo_10.png",
+        "assets/sprites/ufo_11.png",
+        "assets/sprites/ufo_12.png",
+        "assets/sprites/ufo_13.png"
+      ],
+      "fps": 12
+    },
+    "panda": {
+      "frames": [
+        "assets/sprites/panda_0.png",
+        "assets/sprites/panda_1.png",
+        "assets/sprites/panda_2.png"
+      ],
+      "durations": [
+        35,
+        11,
+        24
+      ]
+    },
+    "cherry": {
+      "frames": [
+        "assets/sprites/cherry_0.png",
+        "assets/sprites/cherry_1.png"
+      ],
+      "durations": [
+        8,
+        14
+      ],
+      "anchor": [
+        23.0,
+        23.0
+      ]
+    },
+    "muffin": {
+      "frames": [
+        "assets/sprites/muffin_0.png",
+        "assets/sprites/muffin_1.png"
+      ],
+      "durations": [
+        10,
+        20
+      ]
+    },
+    "dangerHz": {
+      "frames": [
+        "assets/sprites/dangerHz_0.png",
+        "assets/sprites/dangerHz_1.png",
+        "assets/sprites/dangerHz_2.png",
+        "assets/sprites/dangerHz_3.png",
+        "assets/sprites/dangerHz_4.png",
+        "assets/sprites/dangerHz_5.png",
+        "assets/sprites/dangerHz_6.png",
+        "assets/sprites/dangerHz_7.png"
+      ],
+      "fps": 30,
+      "anchor": [
+        144.4,
+        14.0
+      ]
+    },
+    "dangerVt": {
+      "frames": [
+        "assets/sprites/dangerVt_0.png",
+        "assets/sprites/dangerVt_1.png",
+        "assets/sprites/dangerVt_2.png",
+        "assets/sprites/dangerVt_3.png",
+        "assets/sprites/dangerVt_4.png",
+        "assets/sprites/dangerVt_5.png",
+        "assets/sprites/dangerVt_6.png",
+        "assets/sprites/dangerVt_7.png"
+      ],
+      "fps": 30,
+      "anchor": [
+        12.0,
+        156.3
+      ]
+    },
+    "dangerDiag": {
+      "file": "assets/sprites/dangerDiag.png",
+      "anchor": [
+        29.4,
+        29.4
+      ]
+    },
+    "star": "assets/sprites/star.png",
+    "background": {
+      "file": "assets/sprites/background.png",
+      "anchor": [
+        0.0,
+        0.0
+      ]
+    },
+    "fuelBar": {
+      "file": "assets/sprites/fuelBar.png",
+      "anchor": [
+        51.5,
+        30.0
+      ]
+    },
+    "fuelFill": "assets/sprites/fuelFill.png",
+    "scoreBar": {
+      "file": "assets/sprites/scoreBar.png",
+      "anchor": [
+        51.5,
+        30.0
+      ]
+    },
+    "comboBar": {
+      "file": "assets/sprites/comboBar.png",
+      "anchor": [
+        51.5,
+        30.0
+      ]
+    },
+    "gameOver": "assets/sprites/gameOver.png",
+    "btnStart": {
+      "file": "assets/sprites/btnStart.png",
+      "anchor": [
+        63.7,
+        22.25
+      ]
+    },
+    "btnPause": {
+      "file": "assets/sprites/btnPause.png",
+      "anchor": [
+        50.5,
+        16.55
+      ]
+    },
+    "btnMenu": {
+      "file": "assets/sprites/btnMenu.png",
+      "anchor": [
+        42.55,
+        16.55
+      ]
+    },
+    "titleBg": {
+      "frames": [
+        "assets/sprites/titleBg_0.png",
+        "assets/sprites/titleBg_1.png",
+        "assets/sprites/titleBg_2.png",
+        "assets/sprites/titleBg_3.png",
+        "assets/sprites/titleBg_4.png",
+        "assets/sprites/titleBg_5.png",
+        "assets/sprites/titleBg_6.png",
+        "assets/sprites/titleBg_7.png",
+        "assets/sprites/titleBg_8.png",
+        "assets/sprites/titleBg_9.png",
+        "assets/sprites/titleBg_10.png",
+        "assets/sprites/titleBg_11.png",
+        "assets/sprites/titleBg_12.png",
+        "assets/sprites/titleBg_13.png",
+        "assets/sprites/titleBg_14.png",
+        "assets/sprites/titleBg_15.png",
+        "assets/sprites/titleBg_16.png",
+        "assets/sprites/titleBg_17.png",
+        "assets/sprites/titleBg_18.png",
+        "assets/sprites/titleBg_19.png",
+        "assets/sprites/titleBg_20.png",
+        "assets/sprites/titleBg_21.png",
+        "assets/sprites/titleBg_22.png",
+        "assets/sprites/titleBg_23.png",
+        "assets/sprites/titleBg_24.png",
+        "assets/sprites/titleBg_25.png",
+        "assets/sprites/titleBg_26.png",
+        "assets/sprites/titleBg_27.png",
+        "assets/sprites/titleBg_28.png",
+        "assets/sprites/titleBg_29.png",
+        "assets/sprites/titleBg_30.png"
+      ],
+      "durations": [
+        3,
+        1,
+        1,
+        1,
+        2,
+        2,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2
+      ]
+    },
+    "logo": "assets/sprites/logo.png",
+    "titleMadness": "assets/sprites/titleMadness.png"
+  },
+  "audio": {
+    "mainTheme": "assets/audio/main-theme.mp3",
+    "gameOver": "assets/audio/game-over.mp3",
+    "boom": "assets/audio/boom.mp3"
+  },
+  "fonts": {
+    "pixel": "assets/fonts/pixel.ttf"
+  }
+}
