@@ -28,6 +28,18 @@ export function directionForCode(code) {
  * into the same vocabulary as a last resort. That fallback is layout-dependent by nature,
  * which is exactly why it is only used when `code` is missing.
  */
+/**
+ * True while the event comes from a text field (the nickname input on the game-over
+ * screen). Typing there must not steer the ship, move a menu selection or be swallowed by
+ * `preventDefault` — the field owns the keyboard for as long as it has focus.
+ */
+export function isTextEntry(target) {
+  if (!target || typeof target !== 'object') return false;
+  const tag = typeof target.tagName === 'string' ? target.tagName.toUpperCase() : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  return target.isContentEditable === true;
+}
+
 export function normalizeCode(event) {
   if (!event) return null;
   if (event.code) return event.code;
@@ -86,6 +98,7 @@ export function createInput(target = window, { canvas = null } = {}) {
   }
 
   function onKeyDown(e) {
+    if (isTextEntry(e.target)) { held.clear(); refreshState(); return; }
     const code = normalizeCode(e);
     if (!code) return;
     if (NO_SCROLL_CODES.has(code) && typeof e.preventDefault === 'function') e.preventDefault();
@@ -95,6 +108,7 @@ export function createInput(target = window, { canvas = null } = {}) {
   }
 
   function onKeyUp(e) {
+    if (isTextEntry(e.target)) return;
     const code = normalizeCode(e);
     if (!code) return;
     held.delete(code);

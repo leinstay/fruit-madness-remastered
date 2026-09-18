@@ -1,7 +1,7 @@
 // HUD and overlay drawing for the game scene: the three capsules along the top, the
 // PAUSE/MENU buttons along the bottom, the DANGER signs and the boss telegraph bands.
 // Kept out of game.js so that scene stays about the game loop.
-import { W, H, FUEL, COMBO, SCORE_MAX } from '../config.js';
+import { W, H, FUEL, COMBO, ENEMY, SCORE_MAX } from '../config.js';
 import { drawSprite } from '../core/assets.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
@@ -84,6 +84,27 @@ function drawCombo(ctx, assets, combo, frame) {
     ctx.restore();
   }
   drawText(ctx, `x${1 + combo.cells}`, COMBO_BAR.x + 40, y + 6, { size: 14, align: 'right' });
+}
+
+/**
+ * The live contents of the field — the muffins and the enemies — without the player, the
+ * HUD or the buttons. Shared by the game scene and by the game-over screen, which keeps
+ * the same world stepping and drawing behind its UI, as the original does.
+ * Enemies whose own sprite has not been drawn yet (Task 15) fall back to a scaled cherry.
+ */
+export function drawWorldSprites(ctx, assets, world) {
+  const muffinFrame = frameAt(assets.timing('muffin'), assets.frameCount('muffin'), world.frame);
+  for (const s of world.sugars) drawSprite(ctx, assets, 'muffin', muffinFrame, s.x, s.y);
+  for (const e of world.enemies) {
+    const known = assets.has(e.sprite);
+    const name = known ? e.sprite : 'cherry';
+    if (!assets.has(name)) continue;
+    // The per-enemy animOffset was drawn from the world's rng at spawn time, so the wave
+    // does not animate in lockstep and drawing consumes no randomness of its own.
+    const f = frameAt(assets.timing(name), assets.frameCount(name), world.frame + (e.animOffset | 0));
+    if (known) drawSprite(ctx, assets, name, f, e.x, e.y);
+    else drawScaledSprite(ctx, assets, name, f, e.x, e.y, (e.size || ENEMY.SIZE) / ENEMY.SIZE);
+  }
 }
 
 export function drawHud(ctx, assets, { fuel, score, combo, frame }) {

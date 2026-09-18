@@ -24,16 +24,20 @@ canvas {
   height: min(100vh, calc(100vw * 3 / 4));
 }
 
+/* The nickname overlay tracks the canvas box exactly (same size expressions, same centre),
+   so every child can be placed in percentages of the 600x450 logical field and stays put at
+   any window size. Container query units scale the pixel font with it: 1cqh = 1% of the
+   canvas height, i.e. 4.5 logical pixels. */
 #nick-form {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  display: flex;
-  gap: 8px;
-  padding: 12px;
-  background: #090011;
-  border: 2px solid #fff;
+  width: min(100vw, calc(100vh * 4 / 3));
+  height: min(100vh, calc(100vw * 3 / 4));
+  margin: 0;
+  container-type: size;
+  pointer-events: none;      /* only the field and the button take clicks */
   font-family: 'PixelFont', monospace;
 }
 
@@ -41,14 +45,37 @@ canvas {
 
 #nick-form input,
 #nick-form button {
+  position: absolute;
+  top: 56.9%;                /* logical y 256 */
+  height: 8%;                /* logical 36 px */
+  box-sizing: border-box;
+  pointer-events: auto;
   font-family: 'PixelFont', monospace;
-  font-size: 20px;
+  font-size: 4.4cqh;
+  line-height: 1;
   color: #fff;
-  background: #000;
-  border: 2px solid #fff;
-  padding: 4px 8px;
+  background: #090011;
+  border: 0.45cqh solid #fff;
+  border-radius: 0;
+  padding: 0 1.5%;
   outline: none;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-#nick-form button { cursor: pointer; }
+#nick-form input { left: 21%; width: 40%; }
+#nick-form button { left: 63.5%; width: 16%; text-align: center; cursor: pointer; padding: 0; }
+#nick-form button:hover:enabled { color: #ffe14d; border-color: #ffe14d; }
+#nick-form input:disabled, #nick-form button:disabled { opacity: 0.45; cursor: default; }
 #nick-form input::placeholder { color: #776b88; }
+
+#nick-form #nick-error {
+  position: absolute;
+  top: 65.5%;                /* logical y 295, just under the field */
+  left: 21%;
+  width: 58%;
+  margin: 0;
+  font-size: 3.1cqh;
+  color: #ff6b6b;
+  text-align: left;
+}

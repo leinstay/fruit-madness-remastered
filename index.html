@@ -11,8 +11,9 @@
 <div id="stage">
   <canvas id="game" width="600" height="450"></canvas>
   <form id="nick-form" hidden>
-    <input id="nick" maxlength="12" autocomplete="off" placeholder="NICKNAME">
-    <button>OK</button>
+    <input id="nick" maxlength="12" autocomplete="off" spellcheck="false" placeholder="NICKNAME">
+    <button type="submit">SUBMIT</button>
+    <p id="nick-error" role="alert"></p>
   </form>
 </div>
 <script type="module" src="js/main.js"></script>

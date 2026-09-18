@@ -1,10 +1,13 @@
 // Entry point: assets, input, the fixed-step loop and the scene manager.
-import { W, H, SCORE_MAX } from './config.js';
+import { W, H } from './config.js';
 import { createLoop } from './core/loop.js';
-import { loadAssets, drawSprite } from './core/assets.js';
+import { loadAssets } from './core/assets.js';
 import { createInput } from './core/input.js';
 import { drawText, ensurePixelFont } from './core/text.js';
 import { createGameScene } from './scenes/game.js';
+import { createMenuScene } from './scenes/menu.js';
+import { createGameOverScene } from './scenes/gameover.js';
+import { createLeaderboardScene } from './scenes/leaderboard.js';
 
 // The original Background symbol is a flat fill of this colour (docs/assets-inventory.md).
 export const BG_COLOR = '#090011';
@@ -17,9 +20,9 @@ ctx.imageSmoothingEnabled = false;
 const scenes = new Map();
 let current = null;
 
-// Scenes that do not exist yet fall back to one that does, so the game stays playable
-// while the plan fills them in: the real menu and game-over screens arrive in Task 11.
-const SCENE_FALLBACKS = { menu: 'game', leaderboard: 'menu' };
+// A scene that does not exist yet falls back to one that does, so the game stays playable
+// while the plan fills the rest in. All four scenes exist since Task 11, so the map is empty.
+const SCENE_FALLBACKS = {};
 
 export const app = {
   canvas,
@@ -49,28 +52,6 @@ export const app = {
 
 export function registerScene(name, scene) { scenes.set(name, scene); }
 
-// --- Minimal game-over fallback (replaced by the real scene in Task 11) ---------------
-// The extracted `gameOver` sprite already carries the original black letterbox bars, so it
-// is drawn as one full-screen overlay with the score line underneath.
-function createGameOverFallback() {
-  let score = 0;
-  return {
-    enter(theApp, params) { score = (params && params.score) | 0; },
-    update(input) {
-      if (!input) return;
-      if (input.pressed('Enter') || input.pressed('Space') || input.pointer.clicked) app.go('game');
-    },
-    render(c) {
-      c.fillStyle = BG_COLOR;
-      c.fillRect(0, 0, W, H);
-      drawSprite(c, app.assets, 'gameOver', 0, W / 2, H / 2);
-      const shown = Math.min(SCORE_MAX, Math.max(0, score));
-      drawText(c, `SCORE: ${String(shown).padStart(7, '0')}`, W / 2, 225, { size: 24, align: 'center' });
-      drawText(c, 'PRESS ENTER TO RETRY', W / 2, 270, { size: 14, align: 'center' });
-    },
-  };
-}
-
 // --- Boot ---------------------------------------------------------------------------
 async function boot() {
   app.assets = await loadAssets('assets/manifest.json');
@@ -79,9 +60,11 @@ async function boot() {
 
   app.input = createInput(window, { canvas });
 
+  registerScene('menu', createMenuScene());
   registerScene('game', createGameScene());
-  registerScene('gameover', createGameOverFallback());
-  app.go('game');
+  registerScene('gameover', createGameOverScene());
+  registerScene('leaderboard', createLeaderboardScene());
+  app.go('menu');
 
   const loop = createLoop({
     update: () => {
