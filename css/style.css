@@ -1,0 +1,54 @@
+@font-face {
+  font-family: 'PixelFont';
+  src: url('../assets/fonts/pixel.ttf') format('truetype');
+  font-display: block;
+}
+
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; touch-action: none; }
+
+#stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 600x450 logical pixels, scaled to the largest 4:3 rectangle that fits the window */
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+  width: min(100vw, calc(100vh * 4 / 3));
+  height: min(100vh, calc(100vw * 3 / 4));
+}
+
+#nick-form {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: #090011;
+  border: 2px solid #fff;
+  font-family: 'PixelFont', monospace;
+}
+
+#nick-form[hidden] { display: none; }
+
+#nick-form input,
+#nick-form button {
+  font-family: 'PixelFont', monospace;
+  font-size: 20px;
+  color: #fff;
+  background: #000;
+  border: 2px solid #fff;
+  padding: 4px 8px;
+  outline: none;
+}
+
+#nick-form button { cursor: pointer; }
+#nick-form input::placeholder { color: #776b88; }
