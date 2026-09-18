@@ -1,0 +1,124 @@
+# Fruit Madness Remastered
+
+*A panda in a UFO, an endless swarm of very angry fruit, and one muffin between you and an empty tank.*
+
+**[▶ Play now](https://leinstay.github.io/fruit-madness-remastered/)** — no install, no plugins, runs in any modern browser.
+
+![Fruit Madness Remastered gameplay](assets/readme/gameplay.png)
+
+![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![No dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
+
+## About
+
+Fruit Madness is an endless arcade dodge-'em-up. You fly a small flying saucer across a 600×450 pixel
+starfield while waves of fruit charge in from every side; your only job is to slip through the gaps and
+keep collecting the muffins that refuel you. Pixel art, chiptune and a fixed 60 Hz step — the whole thing
+is built in the spirit of NES-era arcade games.
+
+The original *Fruit Madness* was a Flash game we made in 2013
+([leinstay/fruitmadness](https://github.com/leinstay/fruitmadness), ActionScript 3). Flash is gone, so this
+is a from-scratch HTML5 remaster: the same physics constants, the same sprites and the same music, rewritten
+in plain JavaScript with no plugin, no build step and no dependencies.
+
+![The title screen](assets/readme/title.png)
+
+## How to play
+
+- **Move** — `W` `A` `S` `D` or the arrow keys. On a phone or tablet, touch anywhere on the field: a floating
+  joystick appears under your thumb and steers exactly like the keys do.
+- **Pause** — `P` or `Esc`, or the on-screen `PAUSE` button.
+- **Survive.** One touch of any fruit ends the run. The score ticks up on every frame you stay alive, so the
+  longer you last the higher it climbs.
+- **Fuel.** The tank holds 100 units and drains by 0.05 per frame — about 33 seconds of flight. Every muffin
+  gives back 10. Run dry and the saucer does not die, it crawls: top speed drops from 6 to 0.5 px per frame
+  and you are a sitting duck.
+- **Combo.** Four muffins in a row fill the combo bar, and every filled cell raises the score multiplier
+  (up to ×5). A full bar pays a flat 500-point bonus for every further muffin. Let one muffin fly off the
+  screen and the bar resets to zero.
+- **DANGER.** Attacks come in cycles: 15 seconds of one attack, then a 5-second warning that flashes on the
+  edge the next wave will come from. Later on two perpendicular sides can attack at once, and every few
+  cycles a regular attack is replaced by a mini-event — a berry rain, a muffin shower or a boss flyby.
+- **Leaderboard.** After a crash, enter a nickname of 3–6 latin letters or digits to put your score on the
+  online top-10 table.
+
+## Features
+
+- Original pixel art and music from the 2013 game, plus new sprites drawn in the same style.
+- Attack formations that are always dodgeable — never a wall you could not have slipped through.
+- Eight attack directions, double-sided attacks and three mini-events.
+- Fuel, a four-cell combo multiplier and a seven-digit score.
+- Online top-10 leaderboard.
+- Keyboard on desktop, floating touch joystick on mobile.
+- Zero dependencies and no build step; the game also runs fine if the audio fails to load.
+
+## Run locally
+
+```bash
+git clone https://github.com/leinstay/fruit-madness-remastered.git
+cd fruit-madness-remastered
+python -m http.server 8080
+```
+
+Then open <http://localhost:8080>. A server is required because the game is made of ES modules, which
+browsers refuse to load over `file://`.
+
+### Tests
+
+```bash
+node --test tests/          # 129 tests, about 45 seconds
+```
+
+The long survivability proof is opt-in, because it is slow:
+
+```bash
+SOLVER_SEEDS=100 SOLVER_FRAMES=3600 node --test tests/solvability.test.js
+```
+
+`SOLVER_SEEDS` is how many worlds to check (12 by default) and `SOLVER_FRAMES` how many frames of each
+(3600 = one minute of play).
+
+## Tech
+
+Vanilla JavaScript ES modules, Canvas 2D at a fixed 60 Hz step, no framework, no bundler, no build step.
+The leaderboard is a single Firestore collection, read and written straight from the browser with the
+Firebase web SDK loaded from a CDN.
+
+The interesting part is the fairness guarantee. Enemy waves are not random noise: they are laid out on a
+grid of lanes by a generator that always leaves a gap, and every random decision goes through a seeded
+generator, so a world is fully reproducible from its seed. That claim is then checked by a simulator test:
+it replays recorded worlds against a bot that uses the *real* player physics and the *real* hit test, and
+searches for a path that survives every frame. Adding a new attack pattern means nothing until that search
+still finds a way through for every seed.
+
+### Run your own leaderboard
+
+The Firebase web config in `js/config.js` is public by design — it ships inside every Firebase web app and
+grants nothing on its own. All of the security lives in `firestore.rules`, which pins the exact shape of a
+score document and forbids updates and deletes. If you fork this game, create your own Firebase project,
+publish those rules in its console and replace the config block with yours.
+
+## Project structure
+
+```
+index.html          the page: a canvas and the nickname field
+css/                the page shell and the mobile layout
+js/
+  main.js           entry point and scene switching
+  config.js         constants of the original, tuned in 2013
+  core/             loop, input, audio, asset loading, seeded rng, sprite animation
+  game/             player, enemies, formations, director, collisions, combo (pure logic)
+  scenes/           menu, game, game over, leaderboard
+  services/         the Firestore leaderboard client
+assets/             sprites, font, music and sound effects
+tests/              node --test suites, including the survivability simulator
+tools/              the sprite-building script
+firestore.rules     the leaderboard security rules
+```
+
+## Credits
+
+Game, art and music by **Niruin & Fenion** — the Flash original in 2013–2014, this HTML5 remaster in 2026.
+
+## License
+
+[MIT](LICENSE).
