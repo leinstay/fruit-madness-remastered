@@ -1,7 +1,7 @@
 // The TOP 10 table over the shared starfield. The rows are laid out in fixed columns
 // (rank / dotted name / score) so they line up whatever the font's advance widths are.
-// The data comes from js/services/leaderboard.js, which is a localStorage stub until
-// Task 13 puts Firestore behind the same three calls.
+// The data comes from js/services/leaderboard.js (Cloud Firestore); a failed fetch simply
+// leaves the table in its OFFLINE state and never interrupts the game.
 import { W, H } from '../config.js';
 import { drawSprite } from '../core/assets.js';
 import { drawText } from '../core/text.js';
@@ -12,10 +12,10 @@ import { createButtons, drawButton } from './ui.js';
 const TITLE_Y = 70;
 const ROW_TOP = 118;
 const ROW_PITCH = 26;
-const NAME_FIELD = 12;          // characters, padded with dots so the columns read as a table
-const COL_RANK = 130;
-const COL_NAME = 178;
-const COL_SCORE = 470;
+const NAME_FIELD = 6;           // characters (NICK.MAX), padded with dots so the columns read as a table
+const COL_RANK = 163;           // the three columns are re-centred on the 600 px field for 6-character names
+const COL_NAME = 211;
+const COL_SCORE = 437;
 const HIGHLIGHT = '#ffe14d';
 const BTN_BACK = { id: 'back', x: 240, y: 396, w: 120, h: 30, label: 'BACK', size: 24 };
 

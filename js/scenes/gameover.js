@@ -17,11 +17,15 @@ const SCORE_Y = 215;
 const BTN_RETRY = { id: 'retry', x: 168, y: 340, w: 120, h: 30, label: 'RETRY', size: 24 };
 const BTN_MENU = { id: 'menu', x: 312, y: 340, w: 120, h: 30, label: 'MENU', size: 24 };
 
+// Keyed by validateNick's error and by the Error message submitScore rejects with.
 const ERROR_TEXT = {
-  short: '3-12 SYMBOLS',
-  long: '3-12 SYMBOLS',
-  chars: 'LETTERS, DIGITS, _ - ONLY',
-  offline: 'OFFLINE, SCORE NOT SENT',
+  short: '3-6 SYMBOLS',
+  long: '3-6 SYMBOLS',
+  chars: 'LATIN LETTERS AND DIGITS ONLY',
+  invalid: '3-6 SYMBOLS',
+  cooldown: 'WAIT A MOMENT',
+  denied: 'REJECTED',
+  offline: 'OFFLINE - NOT SAVED',
 };
 
 function readNick() {
@@ -75,11 +79,12 @@ export function createGameOverScene() {
       await submitScore(result.value, score);
       submitted = true;
       app.go('leaderboard', { highlight: { name: result.value, score } });
-    } catch {
-      // A failed send must be retryable: the field comes back to life.
+    } catch (err) {
+      // A failed send must be retryable: the field comes back to life and the caption says
+      // why ('cooldown' | 'invalid' | 'denied' | 'offline', see js/services/leaderboard.js).
       busy = false;
       setEnabled(true);
-      showError('offline');
+      showError(ERROR_TEXT[err && err.message] ? err.message : 'offline');
     }
   }
 

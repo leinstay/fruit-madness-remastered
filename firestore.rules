@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Security rules for the Fruit Madness Remastered leaderboard.
+// The client is anonymous, so the rules are the only line of defence: the whole shape of a
+// score document is checked here and nothing can ever be changed or removed once written.
+// The name expression mirrors NICK in js/config.js (3-6 ASCII letters or digits).
+// This file is a copy of what is published in the Firebase console for `fruit-madness-52222`.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /scores/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['name', 'score', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.matches('^[A-Za-z0-9]{3,6}$')
+        && request.resource.data.score is int
+        && request.resource.data.score > 0 && request.resource.data.score < 10000000
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

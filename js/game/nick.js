@@ -6,12 +6,12 @@ import { NICK } from '../config.js';
 /**
  * validateNick(raw) -> { ok: true, value } | { ok: false, error: 'short'|'long'|'chars' }
  *
- * The raw text is trimmed and its runs of whitespace are collapsed to single spaces
- * first, so "  Lein  " and "a  b" are accepted as "Lein" and "a b". The length is then
- * judged on the collapsed value, not on what was typed.
+ * The raw text is only trimmed — inner whitespace is not collapsed, because a space is
+ * itself an invalid character under the 3-6 ASCII letters/digits rule. The length is
+ * judged on the trimmed value, before the character class, so "a_b_c_d" reads as 'long'.
  */
 export function validateNick(raw) {
-  const value = String(raw ?? '').trim().replace(/\s+/g, ' ');
+  const value = String(raw ?? '').trim();
   if (value.length < NICK.MIN) return { ok: false, error: 'short' };
   if (value.length > NICK.MAX) return { ok: false, error: 'long' };
   if (!NICK.RE.test(value)) return { ok: false, error: 'chars' };
