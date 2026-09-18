@@ -5,6 +5,7 @@ import { W, H, FUEL, COMBO, ENEMY, SCORE_MAX } from '../config.js';
 import { drawSprite } from '../core/assets.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
+import { comboMultiplier } from '../game/combo.js';
 import { expandRect, MIN_TOUCH_SIZE } from './ui.js';
 
 // Positions of the original HUD (GameLoop.as); all three capsules sit on the same row.
@@ -40,8 +41,8 @@ export function buttonRect(assets, name, pos) {
   return expandRect(spriteRect(assets, name, pos.x, pos.y), MIN_TOUCH_SIZE, MIN_TOUCH_SIZE);
 }
 
-/** Draws `name` scaled by `scale` about its anchor — used for the combo cells and for the
- *  cherry standing in for enemies whose own sprite has not been drawn yet (Task 15). */
+/** Draws `name` scaled by `scale` about its anchor. The only caller left is the
+ *  missing-sprite safety net in drawWorldSprites. */
 export function drawScaledSprite(ctx, assets, name, frame, x, y, scale) {
   if (!assets || !assets.has(name) || scale <= 0) return;
   const img = assets.img(name, frame);
@@ -77,30 +78,34 @@ function drawScore(ctx, assets, score) {
   });
 }
 
-// Until Task 15 redraws the combo capsule, the extracted `comboBar` sprite is unusable
-// (it has four muffins and the caption "not working yet :(" baked in), so the cells are
-// drawn as small muffins over a spare `scoreBar` frame.
-function drawCombo(ctx, assets, combo, frame) {
-  drawSprite(ctx, assets, 'scoreBar', 0, COMBO_BAR.x, COMBO_BAR.y);
-  const cellScale = 0.5;
-  const pitch = 20;
-  const y = COMBO_BAR.y + 4;
-  const x0 = COMBO_BAR.x - ((COMBO.CELLS - 1) * pitch) / 2 - 14;
-  const muffinFrame = frameAt(assets.timing('muffin'), assets.frameCount('muffin'), frame);
+// The combo capsule: the redrawn `comboBar` frame — empty, and the same shape as the fuel
+// and score bars — with four `comboCell` muffin icons inside it. A filled cell is drawn
+// solid, an empty one dimmed. The multiplier sits under the capsule, where the 2013
+// original printed its "not working yet :(" line.
+const COMBO_CELL_PITCH = 21;
+const COMBO_LABEL_DY = 26;
+
+function drawCombo(ctx, assets, combo) {
+  drawSprite(ctx, assets, 'comboBar', 0, COMBO_BAR.x, COMBO_BAR.y);
+  const x0 = COMBO_BAR.x - ((COMBO.CELLS - 1) * COMBO_CELL_PITCH) / 2;
   for (let i = 0; i < COMBO.CELLS; i++) {
     ctx.save();
-    ctx.globalAlpha = i < combo.cells ? 1 : 0.25;
-    drawScaledSprite(ctx, assets, 'muffin', muffinFrame, x0 + i * pitch, y, cellScale);
+    ctx.globalAlpha = i < combo.cells ? 1 : 0.22;
+    drawSprite(ctx, assets, 'comboCell', 0, x0 + i * COMBO_CELL_PITCH, COMBO_BAR.y);
     ctx.restore();
   }
-  drawText(ctx, `x${1 + combo.cells}`, COMBO_BAR.x + 40, y + 6, { size: 14, align: 'right' });
+  drawText(ctx, `x${comboMultiplier(combo)}`, COMBO_BAR.x, COMBO_BAR.y + COMBO_LABEL_DY, {
+    size: 14, align: 'center',
+  });
 }
 
 /**
  * The live contents of the field — the muffins and the enemies — without the player, the
  * HUD or the buttons. Shared by the game scene and by the game-over screen, which keeps
  * the same world stepping and drawing behind its UI, as the original does.
- * Enemies whose own sprite has not been drawn yet (Task 15) fall back to a scaled cherry.
+ * Every enemy the director and the events can emit now has its own sprite; an enemy whose
+ * sprite is somehow absent from the manifest still falls back to a cherry scaled to its
+ * size rather than vanishing.
  */
 export function drawWorldSprites(ctx, assets, world) {
   const muffinFrame = frameAt(assets.timing('muffin'), assets.frameCount('muffin'), world.frame);
@@ -120,7 +125,7 @@ export function drawWorldSprites(ctx, assets, world) {
 export function drawHud(ctx, assets, { fuel, score, combo, frame }) {
   drawFuel(ctx, assets, fuel.value);
   drawScore(ctx, assets, score);
-  drawCombo(ctx, assets, combo, frame);
+  drawCombo(ctx, assets, combo);
 }
 
 export function drawButtons(ctx, assets) {
