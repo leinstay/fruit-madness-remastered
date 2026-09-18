@@ -1,0 +1,12 @@
+# local development material - never published
+AGENTS.md
+CLAUDE.md
+docs/
+.claude/
+
+# local reference recordings of the 2013 original
+fruit-madness-original*.mp4
+
+node_modules/
+.DS_Store
+Thumbs.db
