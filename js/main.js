@@ -1,10 +1,10 @@
-// Entry point: assets, the fixed-step loop and the scene manager.
-import { W, H } from './config.js';
+// Entry point: assets, input, the fixed-step loop and the scene manager.
+import { W, H, SCORE_MAX } from './config.js';
 import { createLoop } from './core/loop.js';
 import { loadAssets, drawSprite } from './core/assets.js';
-import { createAnim, stepAnim } from './core/anim.js';
+import { createInput } from './core/input.js';
 import { drawText, ensurePixelFont } from './core/text.js';
-import { createStarfield } from './scenes/starfield.js';
+import { createGameScene } from './scenes/game.js';
 
 // The original Background symbol is a flat fill of this colour (docs/assets-inventory.md).
 export const BG_COLOR = '#090011';
@@ -17,58 +17,56 @@ ctx.imageSmoothingEnabled = false;
 const scenes = new Map();
 let current = null;
 
+// Scenes that do not exist yet fall back to one that does, so the game stays playable
+// while the plan fills them in: the real menu and game-over screens arrive in Task 11.
+const SCENE_FALLBACKS = { menu: 'game', leaderboard: 'menu' };
+
 export const app = {
   canvas,
   ctx,
+  bgColor: BG_COLOR,
+  scene: null,
+  sceneName: null,
   assets: null,
   audio: null,
   input: null,
   go(name, params) {
-    const next = scenes.get(name);
+    let key = name;
+    const seen = new Set();
+    while (!scenes.has(key) && SCENE_FALLBACKS[key] && !seen.has(key)) {
+      seen.add(key);
+      key = SCENE_FALLBACKS[key];
+    }
+    const next = scenes.get(key);
     if (!next) { console.warn(`main: unknown scene "${name}"`); return; }
     if (current && current.exit) current.exit();
     current = next;
+    app.scene = next;       // handy from the console when checking the game by hand
+    app.sceneName = key;
     if (current.enter) current.enter(app, params);
   },
 };
 
 export function registerScene(name, scene) { scenes.set(name, scene); }
 
-// --- Temporary scene (replaced by the real menu/game scenes in Task 10) -------------
-function createDemoScene() {
-  const starfield = createStarfield(60);
-  let anims = {};
-
-  function animFor(name) {
-    return createAnim(app.assets.frameCount(name) || 1, app.assets.timing(name));
-  }
-
+// --- Minimal game-over fallback (replaced by the real scene in Task 11) ---------------
+// The extracted `gameOver` sprite already carries the original black letterbox bars, so it
+// is drawn as one full-screen overlay with the score line underneath.
+function createGameOverFallback() {
+  let score = 0;
   return {
-    enter() {
-      anims = {
-        ufo: animFor('ufo'),
-        panda: animFor('panda'),
-        cherry: animFor('cherry'),
-        muffin: animFor('muffin'),
-      };
-    },
-    update() {
-      starfield.update();
-      for (const a of Object.values(anims)) stepAnim(a);
+    enter(theApp, params) { score = (params && params.score) | 0; },
+    update(input) {
+      if (!input) return;
+      if (input.pressed('Enter') || input.pressed('Space') || input.pointer.clicked) app.go('game');
     },
     render(c) {
       c.fillStyle = BG_COLOR;
       c.fillRect(0, 0, W, H);
-      drawSprite(c, app.assets, 'background', 0, 0, 0);
-      starfield.render(c, app.assets);
-
-      drawText(c, 'FRUIT MADNESS', W / 2, 70, { size: 32, align: 'center' });
-
-      // Proof that the loader, the animations and drawSprite work together.
-      drawSprite(c, app.assets, 'ufo', anims.ufo.frame, 150, 225);
-      drawSprite(c, app.assets, 'panda', anims.panda.frame, 150, 207);
-      drawSprite(c, app.assets, 'cherry', anims.cherry.frame, 330, 200);
-      drawSprite(c, app.assets, 'muffin', anims.muffin.frame, 420, 260);
+      drawSprite(c, app.assets, 'gameOver', 0, W / 2, H / 2);
+      const shown = Math.min(SCORE_MAX, Math.max(0, score));
+      drawText(c, `SCORE: ${String(shown).padStart(7, '0')}`, W / 2, 225, { size: 24, align: 'center' });
+      drawText(c, 'PRESS ENTER TO RETRY', W / 2, 270, { size: 14, align: 'center' });
     },
   };
 }
@@ -79,11 +77,17 @@ async function boot() {
   await ensurePixelFont(20);
   ctx.imageSmoothingEnabled = false;
 
-  registerScene('demo', createDemoScene());
-  app.go('demo');
+  app.input = createInput(window, { canvas });
+
+  registerScene('game', createGameScene());
+  registerScene('gameover', createGameOverFallback());
+  app.go('game');
 
   const loop = createLoop({
-    update: () => { if (current && current.update) current.update(app.input); },
+    update: () => {
+      if (current && current.update) current.update(app.input);
+      app.input.endFrame();
+    },
     render: () => {
       ctx.imageSmoothingEnabled = false;
       if (current && current.render) current.render(ctx);
