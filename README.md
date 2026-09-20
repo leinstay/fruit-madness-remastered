@@ -4,7 +4,7 @@
 
 **[▶ Play now](https://leinstay.github.io/fruit-madness-remastered/)** — no install, no plugins, runs in any modern browser.
 
-![Fruit Madness Remastered gameplay](assets/readme/gameplay.png)
+![Fruit Madness Remastered gameplay](assets/readme/gameplay.webp)
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![No dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
 
@@ -22,7 +22,7 @@ in plain JavaScript with no plugin, no build step and no dependencies. The playf
 original vector artwork at whatever resolution your display really has, and every caption is set in the
 game's own pixel font, so the game stays sharp in any window.
 
-![The title screen](assets/readme/title.png)
+![The title screen](assets/readme/title.webp)
 
 ## How to play
 
