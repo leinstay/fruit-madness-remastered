@@ -19,7 +19,9 @@ The result is a single SVG that
     `display="none"`;
   * the game can take apart without an XML parser: every frame group is preceded
     by an exact marker comment, so cutting frame k out is a string slice between
-    `<!--frame:k-->` and the next marker, and `<!--frames:end-->` closes the last;
+    `<!--frame:k-->` and the next marker, and `<!--frames:end-->` closes the last.
+    Every definition sits on a line of its own inside `<defs>`, so the game can
+    index them by id the same way and hand a frame only the drawings it uses;
   * shows the visible field only: `width`/`height` 600x450 and a viewBox centred
     on the symbol's registration point, which is where the game draws it.
 
@@ -135,18 +137,23 @@ def build(fla, freeze=()):
                       % (number, number, "" if number == 0 else ' display="none"',
                          ORIGIN[0], ORIGIN[1], "".join(uses)))
 
-    body = "".join('<g id="%s">%s</g>' % (name, markup) for name, markup in ordered)
+    # One definition per line, and one frame per line. A frame uses about half of the
+    # definitions, so the game builds a document out of just those before it rasterises a
+    # frame; the line layout lets it index them by id with plain string operations and no
+    # XML parser. Newlines are the only whitespace in the file.
+    body = "".join('<g id="%s">%s</g>\n' % (name, markup) for name, markup in ordered)
     view_x = ORIGIN[0] - FIELD_W // 2
     view_y = ORIGIN[1] - FIELD_H // 2
     text = ('<svg xmlns="http://www.w3.org/2000/svg" '
             'xmlns:xlink="http://www.w3.org/1999/xlink" '
-            'width="%d" height="%d" viewBox="%d %d %d %d">'
-            '<defs>%s</defs>'
-            '<!--white backdrop intended by the artwork-->'
-            '<rect x="%d" y="%d" width="%d" height="%d" fill="#ffffff"/>'
-            '%s<!--frames:end--></svg>'
+            'width="%d" height="%d" viewBox="%d %d %d %d">\n'
+            '<defs>\n%s</defs>\n'
+            '<!--white backdrop intended by the artwork-->\n'
+            '<rect x="%d" y="%d" width="%d" height="%d" fill="#ffffff"/>\n'
+            '%s<!--frames:end-->\n</svg>\n'
             % (FIELD_W, FIELD_H, view_x, view_y, FIELD_W, FIELD_H, body,
-               view_x, view_y, FIELD_W, FIELD_H, "".join(frames)))
+               view_x, view_y, FIELD_W, FIELD_H,
+               "".join(frame + "\n" for frame in frames)))
 
     stats = {
         "layers": len(layers),

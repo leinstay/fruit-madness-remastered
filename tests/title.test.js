@@ -118,6 +118,27 @@ test('the frame markers are exactly one per frame and in order', () => {
   }
 });
 
+test('every definition sits on a line of its own and carries an id', () => {
+  // This is what lets the game hand a frame only the drawings it uses: the definitions
+  // are indexed by id with plain line operations, no XML parser. One definition per line,
+  // nothing else between <defs> and </defs>.
+  // Trimmed, exactly as js/core/title-frames.js reads them: a repository checked out with
+  // Windows line endings must work the same.
+  const lines = defsBlock().slice('<defs>'.length).split('\n')
+    .map((l) => l.trim()).filter((l) => l !== '');
+  assert.ok(lines.length > 100, `only ${lines.length} definitions`);
+  const ids = new Set();
+  for (const line of lines) {
+    const id = /^<(\w+) id="([^"]+)"/.exec(line);
+    assert.ok(id, `not one complete definition: ${line.slice(0, 60)}`);
+    assert.ok(!ids.has(id[2]), `id ${id[2]} is used twice`);
+    ids.add(id[2]);
+    assert.ok(line.endsWith(`</${id[1]}>`) || line.endsWith('/>'), `${id[2]} is not closed on its line`);
+    assertBalanced(line, `definition ${id[2]}`);
+  }
+  assert.equal(ids.size, lines.length);
+});
+
 test('the white backdrop is the first drawable child', () => {
   const backdrop = '<rect x="200" y="110" width="600" height="450" fill="#ffffff"/>';
   const at = svg.indexOf(backdrop);
