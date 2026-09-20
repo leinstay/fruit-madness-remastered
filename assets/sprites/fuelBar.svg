@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="103" height="46.5" viewBox="0 0 103 46.5">
+  <g transform="matrix(1, 0, 0, 1, 51.5, 30)">
+    <use height="33" transform="matrix(1, 0, 0, 1, 0, 0)" width="103" xlink:href="#shape0"/>
+    <use height="17.9" transform="matrix(1, 0, 0, 1, -71, -28)" width="60.25" xlink:href="#text0"/>
+  </g>
+  <defs>
+    <g id="shape0">
+      <path d="M-2.35 -14.5 L-0.65 -14.75 -0.55 -14.85 0.5 -14.75 0.55 -14.75 Q1.2 -14.9 1.45 -14.5 L-2.35 -14.5 M-1.95 14.85 L0.45 14.85 -1.2 14.95 -1.95 14.85" fill="#ff82c0" fill-rule="evenodd" stroke="none"/>
+      <path d="M-33 -14.7 L-34.15 -14.55 -35.5 -14.25 Q-40.25 -13.05 -43.65 -10.55 -50 -6.05 -50 0 -50 6 -43.65 10.65 -40.1 13.05 -35.5 14.25 L-34.15 14.55 -33 14.7 -28.4 15 28.6 15 Q37.65 15 43.85 10.65 50 6.25 50 0 50 -6.3 43.85 -10.55 37.6 -15 28.6 -15 L-28.4 -15 -33 -14.7" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+      <path d="M1.45 -14.5 L-2.35 -14.5 -33 -14.7 M-33 14.7 L-1.95 14.85 0.45 14.85" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+    </g>
+    <g id="text0">
+      <g transform="matrix(1, 0, 0, 1, 46.6, 0)">
+        <use fill="#ffffff" height="17.9" transform="matrix(0.0098, 0, 0, 0.0098, 0, 7.5)" width="60.25" xlink:href="#font_04b03_s0"/>
+        <use fill="#ffffff" height="17.9" transform="matrix(0.0098, 0, 0, 0.0098, 5.25, 7.5)" width="60.25" xlink:href="#font_04b03_u0"/>
+        <use fill="#ffffff" height="17.9" transform="matrix(0.0098, 0, 0, 0.0098, 10.5, 7.5)" width="60.25" xlink:href="#font_04b03_g0"/>
+        <use fill="#ffffff" height="17.9" transform="matrix(0.0098, 0, 0, 0.0098, 15.75, 7.5)" width="60.25" xlink:href="#font_04b03_a0"/>
+        <use fill="#ffffff" height="17.9" transform="matrix(0.0098, 0, 0, 0.0098, 21, 7.5)" width="60.25" xlink:href="#font_04b03_r0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, 46.6, 0)">
+        <use fill="#ffffff" height="17.9" transform="matrix(0.0098, 0, 0, 0.0098, 29, 7.5)" width="60.25" xlink:href="#font_04b03_f0"/>
+        <use fill="#ffffff" height="17.9" transform="matrix(0.0098, 0, 0, 0.0098, 33, 7.5)" width="60.25" xlink:href="#font_04b03_u0"/>
+        <use fill="#ffffff" height="17.9" transform="matrix(0.0098, 0, 0, 0.0098, 38.25, 7.5)" width="60.25" xlink:href="#font_04b03_e0"/>
+        <use fill="#ffffff" height="17.9" transform="matrix(0.0098, 0, 0, 0.0098, 43.5, 7.5)" width="60.25" xlink:href="#font_04b03_l0"/>
+      </g>
+    </g>
+    <g id="font_04b03_s0">
+      <path d="M0.55 -138.7 L277.95 -138.7 277.95 -277.4 555.35 -277.4 555.35 -138.7 416.65 -138.7 416.65 0 0.55 0 0.55 -138.7 M139.25 -554.8 L555.35 -554.8 555.35 -416.1 277.95 -416.1 277.95 -277.4 0.55 -277.4 0.55 -416.1 139.25 -416.1 139.25 -554.8" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_u0">
+      <path d="M139.25 -554.8 L139.25 -138.7 0.55 -138.7 0.55 -554.8 139.25 -554.8 M416.65 -138.7 L416.65 -554.8 555.35 -554.8 555.35 0 139.25 0 139.25 -138.7 416.65 -138.7" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_g0">
+      <path d="M139.25 138.7 L139.25 277.4 416.65 277.4 416.65 138.7 555.35 138.7 555.35 -554.8 139.25 -554.8 139.25 -415 0.55 -415 0.55 -139.8 139.25 -139.8 139.25 0 416.65 0 416.65 138.7 139.25 138.7 M139.25 -139.8 L139.25 -415 416.65 -415 416.65 -139.8 139.25 -139.8" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_a0">
+      <path d="M139.25 -415 L0.55 -415 0.55 -139.8 139.25 -139.8 139.25 0 555.35 0 555.35 -554.8 139.25 -554.8 139.25 -415 416.65 -415 416.65 -139.8 139.25 -139.8 139.25 -415" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_r0">
+      <path d="M139.25 -277.4 L139.25 0 0.55 0 0.55 -554.8 139.25 -554.8 139.25 -416.1 277.95 -416.1 277.95 -277.4 139.25 -277.4 M416.65 -554.8 L416.65 -416.1 277.95 -416.1 277.95 -554.8 416.65 -554.8" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_f0">
+      <path d="M139.25 -554.8 L277.95 -554.8 277.95 -416.1 416.65 -416.1 416.65 -277.4 277.95 -277.4 277.95 0 139.25 0 139.25 -277.4 0.55 -277.4 0.55 -416.1 139.25 -416.1 139.25 -554.8 M416.65 -693.5 L416.65 -554.8 277.95 -554.8 277.95 -693.5 416.65 -693.5" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_e0">
+      <path d="M139.25 0 L416.65 0 416.65 -138.7 277.95 -138.7 277.95 -277.4 555.35 -277.4 555.35 -416.1 416.65 -416.1 416.65 -554.8 139.25 -554.8 139.25 -416.1 0.55 -416.1 0.55 -138.7 139.25 -138.7 139.25 0 M277.95 -277.4 L139.25 -277.4 139.25 -416.1 277.95 -416.1 277.95 -277.4" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_l0">
+      <path d="M139.25 -693.5 L139.25 0 0.55 0 0.55 -693.5 139.25 -693.5" fill-rule="evenodd" stroke="none"/>
+    </g>
+  </defs>
+</svg>

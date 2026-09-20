@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="28.5" height="307" viewBox="0 0 28.5 307">
+  <g transform="matrix(1, 0, 0, 1, 12, 156.35)">
+    <use height="307" transform="matrix(1, 0, 0, 1, 158.85, -141.35)" width="28.5" xlink:href="#sprite0"/>
+  </g>
+  <defs>
+    <g id="sprite0">
+      <use height="307" transform="matrix(1, 0, 0, 1, 0, 0)" width="28.5" xlink:href="#text0"/>
+      <use height="307" transform="matrix(1, 0, 0, 1, 0, 0)" width="28.5" xlink:href="#text1"/>
+    </g>
+    <g id="text0">
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 18)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 32)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 46)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 60)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 74)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 4.5, 102)" width="28.5" xlink:href="#font_04b03_v_D0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 4.5, 121)" width="28.5" xlink:href="#font_04b03_v_A0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 4.5, 140)" width="28.5" xlink:href="#font_04b03_v_N0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 4.5, 159)" width="28.5" xlink:href="#font_04b03_v_G0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 178)" width="28.5" xlink:href="#font_04b03_v_E0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 4.5, 197)" width="28.5" xlink:href="#font_04b03_v_R0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 230)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 244)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 258)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 272)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+      <g transform="matrix(1, 0, 0, 1, -170.85, 0)">
+        <use fill="#ff0000" fill-opacity="0" height="307" transform="matrix(0.0216, 0, 0, 0.0216, 6, 286)" width="28.5" xlink:href="#font_04b03_v__0"/>
+      </g>
+    </g>
+    <g id="font_04b03_v__0">
+      <path d="M416.65 -277.4 L277.95 -277.4 277.95 -416.1 416.65 -416.1 416.65 -277.4 M139.25 -277.4 L0.55 -277.4 0.55 -416.1 139.25 -416.1 139.25 -277.4 M416.65 -554.8 L277.95 -554.8 277.95 -693.5 416.65 -693.5 416.65 -554.8 M277.95 -416.1 L139.25 -416.1 139.25 -554.8 277.95 -554.8 277.95 -416.1 M139.25 -554.8 L0.55 -554.8 0.55 -693.5 139.25 -693.5 139.25 -554.8" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_v_D0">
+      <path d="M416.65 0 L416.65 -139.8 555.35 -139.8 555.35 -554.8 416.65 -554.8 416.65 -693.5 0.55 -693.5 0.55 0 416.65 0 M416.65 -139.8 L139.25 -139.8 139.25 -553.7 416.65 -553.7 416.65 -139.8" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_v_A0">
+      <path d="M416.65 -277.4 L139.25 -277.4 139.25 -553.7 416.65 -553.7 416.65 -277.4 M139.25 -554.8 L0.55 -554.8 0.55 0 139.25 0 139.25 -138.7 416.65 -138.7 416.65 0 555.35 0 555.35 -554.8 416.65 -554.8 416.65 -693.5 139.25 -693.5 139.25 -554.8" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_v_N0">
+      <path d="M139.25 -416.1 L139.25 0 0.55 0 0.55 -693.5 139.25 -693.5 139.25 -554.8 277.95 -554.8 277.95 -416.1 139.25 -416.1 M416.65 -277.4 L277.95 -277.4 277.95 -416.1 416.65 -416.1 416.65 -693.5 555.35 -693.5 555.35 0 416.65 0 416.65 -277.4" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_v_G0">
+      <path d="M555.35 0 L555.35 -416.1 277.95 -416.1 277.95 -277.4 416.65 -277.4 416.65 -138.7 139.25 -138.7 139.25 0 555.35 0 M139.25 -554.8 L139.25 -138.7 0.55 -138.7 0.55 -554.8 139.25 -554.8 139.25 -693.5 555.35 -693.5 555.35 -554.8 139.25 -554.8" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_v_E0">
+      <path d="M416.65 0 L0.55 0 0.55 -693.5 416.65 -693.5 416.65 -554.8 139.25 -554.8 139.25 -416.1 416.65 -416.1 416.65 -277.4 139.25 -277.4 139.25 -138.7 416.65 -138.7 416.65 0" fill-rule="evenodd" stroke="none"/>
+    </g>
+    <g id="font_04b03_v_R0">
+      <path d="M555.35 0 L555.35 -138.7 416.65 -138.7 416.65 -278.5 555.35 -278.5 555.35 -554.8 416.65 -554.8 416.65 -278.5 139.25 -278.5 139.25 -555.9 416.65 -555.9 416.65 -693.5 0.55 -693.5 0.55 0 139.25 0 139.25 -138.7 416.65 -138.7 416.65 0 555.35 0" fill-rule="evenodd" stroke="none"/>
+    </g>
+  </defs>
+</svg>

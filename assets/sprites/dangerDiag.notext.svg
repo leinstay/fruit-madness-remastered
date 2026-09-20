@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="58.7" height="60.5" viewBox="0 0 58.7 60.5">
+  <g transform="matrix(1, 0, 0, 1, 29.35, 29.35)">
+    <use height="58.3" transform="matrix(1, 0, 0, 1, 0, 0)" width="58.7" xlink:href="#shape0"/>
+  </g>
+  <defs>
+    <g id="shape0">
+      <path d="M17.65 -17.75 Q25 -10.45 25 -0.2 25 10.05 17.65 17.3 10.3 24.6 0 24.6 -10.3 24.6 -17.65 17.3 -25 10.05 -25 -0.2 -25 -10.45 -17.65 -17.75 -10.3 -25 0 -25 10.3 -25 17.65 -17.75 Z" fill="none" stroke="#ff0000" stroke-linecap="round" stroke-linejoin="round" stroke-width="8.75"/>
+    </g>
+  </defs>
+</svg>
