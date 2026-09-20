@@ -19,8 +19,6 @@ import { drawJoystick } from './joystick-view.js';
 
 // How long the wreck burns before the score screen takes over.
 const DEATH_FRAMES = 90;
-// The pilot sits in the dome, above the saucer's centre, and tilts with the hull.
-const PILOT_OFFSET_Y = -14;
 
 export function createGameScene() {
   const starfield = createStarfield(60);
@@ -125,11 +123,9 @@ export function createGameScene() {
       const ufoFrame = frameAt(assets.timing('ufo'), assets.frameCount('ufo'), world.frame);
       const pandaFrame = frameAt(assets.timing('panda'), assets.frameCount('panda'), world.frame);
       drawSprite(c, assets, 'ufo', ufoFrame, player.x, player.y, player.rotation);
-      c.save();
-      c.translate(player.x, player.y);
-      c.rotate((player.rotation * Math.PI) / 180);
-      drawSprite(c, assets, 'panda', pandaFrame, 0, PILOT_OFFSET_Y);
-      c.restore();
+      // As in 2013, the pilot is a separate clip kept on the ship's position: its registration
+      // point lands exactly on the player's, and only the saucer tilts.
+      drawSprite(c, assets, 'panda', pandaFrame, player.x, player.y);
     }
     if (explosion) explosion.render(c);
 
