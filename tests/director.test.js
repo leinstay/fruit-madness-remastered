@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DIRECTOR, ENEMY } from '../js/config.js';
 import { createRng } from '../js/core/rng.js';
-import { createDirector, stepDirector, waveInterval } from '../js/game/director.js';
+import { CAST, createDirector, stepDirector, waveInterval } from '../js/game/director.js';
 
 test('waveInterval goes 60 -> 35 over 12 shifts and stays', () => {
   assert.equal(waveInterval(0), 60); assert.equal(waveInterval(12), 35); assert.equal(waveInterval(40), 35);
@@ -98,26 +98,30 @@ test('doubles start on the third attack: ~40% there, ~80% from the fourth on, ne
     assert.ok(rate(i) <= DIRECTOR.DOUBLE_MAX_CHANCE + 0.06, `attack ${i + 1} exceeds the cap: ${rate(i)}`);
   }
 });
-test('every plan is a plain attack with the original cherry', () => {
+test('every plan is a plain attack flying one fruit of the cast', () => {
+  // There are no mini-events: a plan is an attack from one side, or from two, and it
+  // names a single fruit that the whole attack is flown with.
   for (let seed = 1; seed <= 30; seed++) {
-    const d = createDirector(createRng(seed)); let prev = null;
+    const d = createDirector(createRng(seed), { seed }); let prev = null;
     for (let f = 0; f < 1200 * 15; f++) {
       stepDirector(d);
       if (d.plan !== prev) {
         assert.notEqual(d.plan.type, 'event', `seed ${seed}: an event plan at shift ${d.shift}`);
-        assert.equal(d.plan.fruit, 'cherry', `seed ${seed}: fruit at shift ${d.shift}`);
+        assert.ok(CAST.includes(d.plan.fruit), `seed ${seed}: fruit ${d.plan.fruit} at shift ${d.shift}`);
         assert.ok(Array.isArray(d.plan.modes) && d.plan.modes.length >= 1);
         prev = d.plan;
       }
     }
   }
 });
-test('every spawned enemy is a cherry of the standard size', () => {
+test('every spawned enemy is a fruit of the cast at the standard size', () => {
+  // Which fruit belongs to which attack is tests/fruit-cast.test.js; here it only has to
+  // be one of the six and to carry the 2013 hit box whatever it is drawn as.
   for (let seed = 1; seed <= 30; seed++) {
-    const d = createDirector(createRng(seed));
+    const d = createDirector(createRng(seed), { seed });
     for (let f = 0; f < 1200 * 15; f++) {
       for (const e of stepDirector(d).enemies) {
-        assert.equal(e.sprite, 'cherry');
+        assert.ok(CAST.includes(e.sprite), `seed ${seed}: unknown fruit ${e.sprite}`);
         assert.equal(e.size, ENEMY.SIZE);
         assert.equal(e.r, ENEMY.HIT_R);
       }

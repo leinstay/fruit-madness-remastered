@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ENEMY } from '../js/config.js';
-import { FRUIT } from '../js/game/director.js';
+import { CAST } from '../js/game/director.js';
 import { MODES } from '../js/game/modes.js';
 import { layeredEntry } from '../js/core/assets.js';
 
@@ -65,8 +65,8 @@ test('every animated sprite has timing for exactly its frames', () => {
 });
 
 test('every sprite the game logic can name is in the manifest', () => {
-  // The one fruit the director hands to every attack wave.
-  assert.ok(FRUIT in sprites, `director can emit '${FRUIT}'`);
+  // The fruit the director hands to an attack wave — one per attack, out of the cast.
+  for (const fruit of CAST) assert.ok(fruit in sprites, `director can emit '${fruit}'`);
   // The DANGER signs are runtime text: a mode describes the side or the corner its attack
   // comes from and never names a drawing, so the manifest holds no sign art at all.
   for (const [id, mode] of Object.entries(MODES)) {

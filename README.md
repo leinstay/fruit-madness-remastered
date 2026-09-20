@@ -10,8 +10,10 @@
 
 Fruit Madness is an endless arcade dodge-'em-up. You fly a small flying saucer across a 600×450 pixel
 starfield while waves of fruit charge in from every side; your only job is to slip through the gaps and
-keep collecting the muffins that refuel you. Pixel art, chiptune and a fixed 60 Hz step — the whole thing
-is built in the spirit of NES-era arcade games.
+keep collecting the muffins that refuel you. Every attack flies a single fruit — cherry, apple, pear,
+pomegranate, lime or banana — and the DANGER sign that announces the next one always means a different
+face is coming. Pixel art, chiptune and a fixed 60 Hz step — the whole thing is built in the spirit of
+NES-era arcade games.
 
 The original *Fruit Madness* was a Flash game we made in 2013
 ([leinstay/fruitmadness](https://github.com/leinstay/fruitmadness), ActionScript 3). Flash is gone, so this
@@ -49,7 +51,7 @@ browsers refuse to load over `file://`.
 ### Tests
 
 ```bash
-node --test tests/          # 255 tests, about two minutes
+node --test tests/          # 272 tests, about a minute
 ```
 
 The long survivability proof is opt-in, because it is slow:

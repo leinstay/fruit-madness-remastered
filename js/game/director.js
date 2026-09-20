@@ -2,11 +2,21 @@
 // stepDirector() only reports what should be spawned on the current frame; moving and
 // storing live entities is the world's job.
 import { DIRECTOR } from '../config.js';
+import { createRng } from '../core/rng.js';
 import { MODES, spawnEnemy, PERPENDICULAR_PAIRS } from './modes.js';
 import { createFormation, maxGapShift, FORMATIONS } from './patterns.js';
 
-// Every enemy is the cherry of the 2013 original.
+// The fruit every run opens on, as the 2013 original did.
 export const FRUIT = 'cherry';
+
+// The six fruit of the title screen. One attack flies one of them and nothing else, so a
+// DANGER sign always announces a change of fruit as well as a change of direction.
+export const CAST = ['cherry', 'apple', 'pear', 'pomegranate', 'lime', 'banana'];
+
+// The cast is drawn from a generator of its own, seeded beside the world's. Which fruit
+// flies therefore costs the run no randomness at all: the lanes, the velocities, the wave
+// timings and the muffins of a seed are exactly what they were when the cherry flew alone.
+const CAST_SEED_MIX = 0x9E3779B9;
 
 const ALL_MODES = [1, 2, 3, 4, 5, 6, 7, 8];
 // Diagonal starting points are sparse, so only the two formations that read well there.
@@ -57,10 +67,36 @@ function spawnWave(d, stream, out) {
   }
 }
 
+/**
+ * A fresh bag holding the whole cast in a shuffled order, with `avoid` kept off the front
+ * so the fruit that is flying now cannot open the next bag either. Every fruit therefore
+ * takes its turn before any of them comes back, and no two attacks in a row share one.
+ */
+function refillBag(d, avoid) {
+  const bag = CAST.slice();
+  for (let i = bag.length - 1; i > 0; i--) {
+    const j = d.castRng.int(0, i);
+    const t = bag[i]; bag[i] = bag[j]; bag[j] = t;
+  }
+  if (bag[0] === avoid) {
+    const j = d.castRng.int(1, bag.length - 1);
+    const t = bag[0]; bag[0] = bag[j]; bag[j] = t;
+  }
+  return bag;
+}
+
+/** The fruit of the next attack: the front of the bag, refilled when it runs out. */
+function nextFruit(d) {
+  if (d.bag.length === 0) d.bag = refillBag(d, d.plan.fruit);
+  return d.bag.shift();
+}
+
 function chooseNextPlan(d) {
   const rng = d.rng;
   const nextShift = d.shift + 1;
   const current = d.plan.modes;
+  // Exactly one fruit per plan, whichever shape the attack turns out to have.
+  const fruit = nextFruit(d);
 
   const doubleChance = Math.min(
     DIRECTOR.DOUBLE_MAX_CHANCE,
@@ -69,11 +105,11 @@ function chooseNextPlan(d) {
   if (nextShift >= DIRECTOR.DOUBLE_FROM_SHIFT && rng.chance(doubleChance)) {
     const sameAsNow = (p) => p.length === current.length && p.every((m) => current.includes(m));
     const pairs = PERPENDICULAR_PAIRS.filter((p) => !sameAsNow(p));
-    return { type: 'double', modes: [...rng.pick(pairs.length ? pairs : PERPENDICULAR_PAIRS)], fruit: FRUIT };
+    return { type: 'double', modes: [...rng.pick(pairs.length ? pairs : PERPENDICULAR_PAIRS)], fruit };
   }
 
   const pool = ALL_MODES.filter((m) => !current.includes(m));
-  return { type: 'single', modes: [rng.pick(pool)], fruit: FRUIT };
+  return { type: 'single', modes: [rng.pick(pool)], fruit };
 }
 
 function toWarning(d) {
@@ -97,13 +133,17 @@ function toAttack(d) {
   armPlan(d);
 }
 
-export function createDirector(rng, { startShift = 0 } = {}) {
+export function createDirector(rng, { startShift = 0, seed = 0 } = {}) {
   const d = {
     rng,
+    // Beside the world's rng, never in front of it: see CAST_SEED_MIX.
+    castRng: createRng((seed ^ CAST_SEED_MIX) >>> 0),
+    bag: [],
     phase: 'attack',
     timer: 0,
     shift: startShift,
     difficulty: DIRECTOR.START_DIFFICULTY + startShift * DIRECTOR.DIFFICULTY_STEP,
+    // Every run opens on the cherry, whatever shift it starts at.
     plan: { type: 'single', modes: [1], fruit: FRUIT },
     nextPlan: null,
     warnings: [],

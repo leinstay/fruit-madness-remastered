@@ -12,7 +12,7 @@ export function createWorld(seed, { startShift = 0 } = {}) {
   return {
     frame: 0,
     rng,
-    director: createDirector(rng, { startShift }),
+    director: createDirector(rng, { startShift, seed }),
     enemies: [],
     sugars: [],
     warnings: [],
