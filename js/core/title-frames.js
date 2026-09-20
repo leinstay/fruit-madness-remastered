@@ -781,6 +781,13 @@ export function createTitleFrames({
   return {
     draw,
     failed: () => status === 'failed',
+    /**
+     * Whether the base keyframe is on hand, i.e. the next `draw` puts the artwork on screen
+     * rather than nothing. This is what the menu waits for before it shows itself, so that
+     * the first thing the player sees is the finished title and not its flat backdrop; a
+     * scale change drops the base and it goes false again while the cache is rebuilt.
+     */
+    ready: () => base !== null,
     frameCount: count,
     /** Which keyframe the last `draw` actually put on screen, or -1 before the first one. */
     shownFrame: () => shownIndex,

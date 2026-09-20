@@ -11,8 +11,10 @@
 // "START" is not part of the artwork either: it is the caption of the `btnStart` symbol.
 import { W, H } from '../config.js';
 import { createTitleFrames, titleKeyframeAt } from '../core/title-frames.js';
+import { loadingState } from '../core/loading.js';
 import { drawText } from '../core/text.js';
 import { drawButtonCaption } from './captions.js';
+import { drawLoading } from './loading.js';
 import { createButtons, drawButton, drawMarker } from './ui.js';
 
 // The flat navy the title art is painted over (sampled from the artwork). It stands in
@@ -39,6 +41,9 @@ const MUTED_KEY = 'fm.muted';
 // from its beginning again, as the original did. Booting, or stepping back from the
 // leaderboard — a sub-screen of this menu — leaves the music exactly where it is.
 const RUN_SCENES = ['game', 'gameover'];
+
+const now = () => (typeof performance === 'object' && performance && typeof performance.now === 'function'
+  ? performance.now() : Date.now());
 
 /**
  * localStorage is read lazily and defensively: it throws when site data is blocked.
@@ -69,6 +74,29 @@ export function createMenuScene() {
   let title = null;
   let frames = 1;
   let timing = null;
+  // The second half of the loading screen js/main.js starts: the sprites are in, but the
+  // title artwork still has to be fetched, sliced and rasterised, and until its first
+  // keyframe exists the menu would be nothing but labels on a flat navy rectangle. So it
+  // hides, and lets the loading screen stand, for as long as that takes.
+  let revealed = false;   // shown once means shown for good: no second loading screen
+  let waitSince = 0;      // when the wait began, i.e. when the sprites were done
+
+  /**
+   * The loading screen's state, or null once the menu is on screen. The wait ends when the
+   * artwork is ready, when it is known to be unusable, and in any case after the timeout:
+   * the title is decoration, every label and every button here is runtime text, so a slow
+   * or missing file must cost a picture and never the game.
+   */
+  function loading() {
+    if (revealed) return null;
+    const state = loadingState({
+      titleReady: Boolean(title) && title.ready(),
+      titleFailed: !title || title.failed(),
+      msSinceAssets: now() - waitSince,
+    });
+    if (!state.show) { revealed = true; return null; }
+    return state;
+  }
 
   /**
    * Draws the title frame for this tick. The artwork rasterises in the background and
@@ -84,6 +112,8 @@ export function createMenuScene() {
   }
 
   function update(input) {
+    // Nothing on the loading screen is a button, so nothing there reacts to one.
+    if (loading()) return;
     tick += 1;
     const activated = buttons.update(input);
     if (activated === 'start') app.go('game');
@@ -100,6 +130,20 @@ export function createMenuScene() {
   }
 
   function render(c) {
+    const wait = loading();
+    if (wait) {
+      // Asking for a keyframe is what starts the download and keeps the cache filling, so
+      // the title is still driven here; the loading screen simply covers whatever it paints.
+      if (title) title.draw(c, titleKeyframeAt(timing, frames, tick), app.renderScale);
+      c.save();
+      c.fillStyle = app.bgColor;
+      c.fillRect(0, 0, W, H);
+      c.restore();
+      drawLoading(c, { progress: wait.progress, time: now() });
+      return;
+    }
+    // `tick` has stood still all the while, so the artwork opens on its first keyframe —
+    // which is the one the cache prepared first and therefore the one that is ready.
     drawTitle(c, titleKeyframeAt(timing, frames, tick));
 
     for (const label of LABELS) {
@@ -128,6 +172,7 @@ export function createMenuScene() {
       // re-download the file or throw the rasterised frames away.
       const layered = app.assets.layered ? app.assets.layered('titleBg') : null;
       if (layered && !title) title = createTitleFrames({ url: layered.file, size: layered.size });
+      if (waitSince === 0) waitSince = now();   // the boot handed over; the title's clock starts
       frames = layered ? layered.frameCount : 1;
       timing = layered ? layered.durations : null;
       // There is only one music track, and adding another is not allowed, so the title

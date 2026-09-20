@@ -6,6 +6,8 @@ import { loadAssets } from './core/assets.js';
 import { createAudio } from './core/audio.js';
 import { createInput, attachTouch } from './core/input.js';
 import { drawText, ensurePixelFont } from './core/text.js';
+import { loadingState } from './core/loading.js';
+import { drawLoading } from './scenes/loading.js';
 import { createGameScene } from './scenes/game.js';
 import { createMenuScene } from './scenes/menu.js';
 import { createGameOverScene } from './scenes/gameover.js';
@@ -122,9 +124,41 @@ function watchCanvasSize() {
 }
 
 // --- Boot ---------------------------------------------------------------------------
+// Everything below the first paint is a wait the player can see, so it happens behind the
+// loading screen: the sprite frames are counted onto its bar, and the menu scene keeps the
+// same screen up afterwards until the title artwork has its first keyframe.
+
+const nowMs = () => (typeof performance === 'object' && performance && typeof performance.now === 'function'
+  ? performance.now() : Date.now());
+
+function paintLoading(state) {
+  ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = BG_COLOR;
+  ctx.fillRect(0, 0, W, H);
+  drawLoading(ctx, { progress: state.progress, time: nowMs() });
+}
+
 async function boot() {
   watchCanvasSize();
-  app.assets = await loadAssets('assets/manifest.json');
+
+  let loaded = 0;
+  let expected = 0;
+  let booting = true;
+  // Painted before a single thing is awaited, so the first frame the browser puts up is
+  // this and never the empty canvas. The rest of the phase is repainted per frame, both to
+  // follow the bar and because a resize clears the backing store.
+  paintLoading(loadingState({}));
+  const repaint = () => {
+    if (!booting) return;
+    paintLoading(loadingState({ assetsDone: loaded, assetsTotal: expected }));
+    requestAnimationFrame(repaint);
+  };
+  requestAnimationFrame(repaint);
+
+  app.assets = await loadAssets('assets/manifest.json', {
+    onProgress: (done, total) => { loaded = done; expected = total; },
+  });
   app.assets.rasterise(renderScale);
   await ensurePixelFont(20);
   ctx.imageSmoothingEnabled = false;
@@ -141,6 +175,9 @@ async function boot() {
   registerScene('game', createGameScene());
   registerScene('gameover', createGameOverScene());
   registerScene('leaderboard', createLeaderboardScene());
+  // From here on the loop paints, and the menu scene decides for itself how much longer the
+  // loading screen stays up while the title artwork is prepared.
+  booting = false;
   app.go('menu');
 
   const loop = createLoop({

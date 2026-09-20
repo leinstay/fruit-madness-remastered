@@ -201,7 +201,12 @@ function rasteriseFrame(image, size, scale) {
 
 // Loads every sprite in the manifest. A missing or broken drawing never rejects the whole
 // load: the key is named once and simply reports has(name) === false from then on.
-export async function loadAssets(manifestUrl) {
+//
+// `onProgress(done, total)` is called once the manifest has said how many frames there are
+// and then after every single one of them settles, loaded or not — it counts what has been
+// waited for, which is what the loading screen's bar is driven by. It is optional and it is
+// never allowed to break a load: a callback that throws is ignored.
+export async function loadAssets(manifestUrl, { onProgress = null } = {}) {
   let manifest = { sprites: {}, audio: {}, fonts: {} };
   try {
     const res = await fetch(manifestUrl, { cache: 'no-cache' });
@@ -215,6 +220,17 @@ export async function loadAssets(manifestUrl) {
   const layers = new Map();   // the symbols that live in one file of their own
   const sprites = new Map();  // the ones with images to blit
   const jobs = [];
+  let total = 0;              // known once every key has been walked, below
+  let settled = 0;
+  const report = () => {
+    if (typeof onProgress !== 'function') return;
+    try {
+      onProgress(settled, total);
+    } catch (err) {
+      console.warn('assets: the progress callback threw:', err);
+      onProgress = null;
+    }
+  };
   for (const [name, entry] of Object.entries(manifest.sprites || {})) {
     let source;
     let spec;
@@ -238,9 +254,17 @@ export async function loadAssets(manifestUrl) {
     };
     sprites.set(name, record);
     source.frames.forEach((url, i) => {
-      jobs.push(loadFrame(url).then((img) => { record.images[i] = img; }));
+      jobs.push(loadFrame(url).then((img) => {
+        record.images[i] = img;
+        settled += 1;
+        report();
+      }));
     });
   }
+  // A frame can only settle on a network event, i.e. never during the loop above, so the
+  // first thing anyone hears is this: nothing done out of everything there is.
+  total = jobs.length;
+  report();
   await Promise.all(jobs);
 
   // Every frame has been asked for twice by now. Whatever arrived is what the sprite has;

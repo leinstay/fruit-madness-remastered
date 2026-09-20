@@ -585,6 +585,32 @@ test('the composed canvas is the size of the base frame and counts against the b
   assert.equal(stats.bytes, stats.baseBytes + stats.composedBytes + stats.patchBytes);
 });
 
+test('the base keyframe announces itself, so the menu knows when to show up', async () => {
+  // The menu holds the loading screen until this turns true: the first thing the player
+  // sees is then the finished title rather than the flat backdrop behind it.
+  const canvases = fakeCanvases();
+  const title = createTitleFrames({
+    url: 'titleBg.svg',
+    size: [100, 60],
+    tile: 20,
+    loadText: () => Promise.resolve(toyFile(4)),
+    decodeFrame: (pieces) => Promise.resolve({ image: { frame: frameOf(pieces) }, release() {} }),
+    yieldToLoop: () => Promise.resolve(),
+    createCanvas: canvases.create,
+  });
+  const ctx = stubContext();
+  assert.equal(title.ready(), false, 'nothing is ready before the file is even asked for');
+  title.draw(ctx, 0, 1);
+  assert.equal(title.ready(), false, 'and not on the frame that starts the download either');
+  for (let i = 0; i < 200 && !title.ready(); i += 1) {
+    title.draw(ctx, 0, 1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  assert.equal(title.ready(), true, 'the base keyframe never arrived');
+  assert.equal(title.stats().prepared >= 1, true);
+  assert.equal(title.draw(ctx, 0, 1), true, 'and from then on the artwork is painted');
+});
+
 // --- when the artwork does not arrive ---------------------------------------------------
 
 /** A canvas context that records nothing but the fact that it was drawn on. */

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeSpriteEntry, spriteSource, rasterFrameSize, isCacheable, layeredEntry,
-  retryUrl, frameOutcome,
+  retryUrl, frameOutcome, loadAssets,
 } from '../js/core/assets.js';
 
 test('string form: a single frame, no timing, centre anchor', () => {
@@ -211,4 +211,71 @@ test('the real manifest normalizes: one set of art, with a size and an anchor on
   assert.deepEqual(normalizeSpriteEntry(manifest.sprites.ufo).size, [71.1, 69.1]);
   assert.equal(normalizeSpriteEntry(manifest.sprites.scoreBar).notext, 'assets/sprites/scoreBar.notext.svg');
   assert.equal(normalizeSpriteEntry(manifest.sprites.star).notext, null);
+});
+
+// --- what the loading screen is told ---------------------------------------------------
+// The bar is driven by frames that have really settled, so the loader counts them one by
+// one against a total it only knows once the manifest has been walked.
+
+/** Runs `body` with fetch and Image faked, so loadAssets can run outside a browser. */
+async function withFakeNetwork(manifest, body) {
+  const saved = { fetch: globalThis.fetch, Image: globalThis.Image };
+  globalThis.fetch = async () => ({ ok: true, json: async () => manifest });
+  globalThis.Image = class {
+    set src(url) {
+      this._src = url;
+      // A real frame settles on a network event, never inside the loader's own loop.
+      setTimeout(() => { this.width = 8; this.height = 8; if (this.onload) this.onload(); }, 0);
+    }
+
+    get src() { return this._src; }
+  };
+  try {
+    return await body();
+  } finally {
+    globalThis.fetch = saved.fetch;
+    globalThis.Image = saved.Image;
+  }
+}
+
+test('the loader counts every frame it waits for, starting from none of them', async () => {
+  const sprite = (file) => ({ file, size: [10, 10], anchor: [5, 5] });
+  const manifest = {
+    sprites: {
+      one: sprite('one.svg'),
+      two: { frames: ['two_0.svg', 'two_1.svg'], fps: 10, size: [10, 10], anchor: [5, 5] },
+      caption: { file: 'x.svg', size: [10, 10], anchor: [5, 5], textOnly: true },
+      titleBg: { file: 't.svg', layered: true, frameCount: 2, size: [600, 450] },
+    },
+  };
+  const seen = [];
+  await withFakeNetwork(manifest, () => loadAssets('manifest.json', {
+    onProgress: (done, total) => seen.push([done, total]),
+  }));
+  // Three frames to fetch: the lone sprite and the two of the animation. The caption has no
+  // art at all and the layered title is not loaded as frames.
+  assert.deepEqual(seen, [[0, 3], [1, 3], [2, 3], [3, 3]]);
+});
+
+test('a progress callback that throws costs progress, never the game', async () => {
+  const manifest = { sprites: { one: { file: 'one.svg', size: [10, 10], anchor: [5, 5] } } };
+  const warned = [];
+  const realWarn = console.warn;
+  console.warn = (...args) => warned.push(args.map(String).join(' '));
+  try {
+    const assets = await withFakeNetwork(manifest, () => loadAssets('manifest.json', {
+      onProgress: () => { throw new Error('no'); },
+    }));
+    assert.equal(assets.has('one'), true, 'the art still loaded');
+  } finally {
+    console.warn = realWarn;
+  }
+  assert.equal(warned.length, 1, `expected one warning, got ${warned.length}`);
+});
+
+test('a loader nobody is watching behaves exactly as it always did', async () => {
+  const manifest = { sprites: { one: { file: 'one.svg', size: [10, 10], anchor: [5, 5] } } };
+  const assets = await withFakeNetwork(manifest, () => loadAssets('manifest.json'));
+  assert.equal(assets.has('one'), true);
+  assert.deepEqual(assets.size('one'), [10, 10]);
 });
