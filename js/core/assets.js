@@ -12,6 +12,7 @@
 // symbols, with two extra fields: `size` is the exact logical viewport [w, h] (fractional,
 // so the image centre is no longer a safe default and `anchor` is always spelled out), and
 // `notext` names a variant of the file with the baked-in caption removed.
+import { deviceScale, snapToDevice } from './canvas.js';
 
 export function normalizeSpriteEntry(entry) {
   if (typeof entry === 'string') {
@@ -127,18 +128,25 @@ export async function loadAssets(manifestUrl) {
 // Draws one frame so that the sprite's anchor (its centre when there is no anchor)
 // lands on (x, y); the rotation happens about that same point.
 // Silently does nothing when the sprite is missing, so a failed asset never breaks a scene.
+//
+// The destination is snapped to a whole device pixel, not to a whole logical one: the
+// canvas is drawn at the display's resolution, so that is where the pixel grid actually is.
+// Raster frames are blitted with smoothing off, which keeps the art that has not been
+// redrawn from its vector source hard-edged at any scale.
 export function drawSprite(ctx, assets, name, frame = 0, x = 0, y = 0, rotationDeg = 0) {
   if (!ctx || !assets || !assets.has || !assets.has(name)) return;
   const image = assets.img(name, frame);
   if (!image || !image.width) return;
   const a = assets.anchor(name) || [image.width / 2, image.height / 2];
+  const s = deviceScale(ctx);
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
   if (rotationDeg) {
-    ctx.save();
-    ctx.translate(Math.round(x), Math.round(y));
+    ctx.translate(snapToDevice(x, s), snapToDevice(y, s));
     ctx.rotate((rotationDeg * Math.PI) / 180);
-    ctx.drawImage(image, Math.round(-a[0]), Math.round(-a[1]));
-    ctx.restore();
+    ctx.drawImage(image, -a[0], -a[1]);
   } else {
-    ctx.drawImage(image, Math.round(x - a[0]), Math.round(y - a[1]));
+    ctx.drawImage(image, snapToDevice(x - a[0], s), snapToDevice(y - a[1], s));
   }
+  ctx.restore();
 }

@@ -1,6 +1,7 @@
 // Entry point: assets, input, the fixed-step loop and the scene manager.
 import { W, H, AUDIO_BASE_URL } from './config.js';
 import { createLoop } from './core/loop.js';
+import { computeBackingSize } from './core/canvas.js';
 import { loadAssets } from './core/assets.js';
 import { createAudio } from './core/audio.js';
 import { createInput, attachTouch } from './core/input.js';
@@ -17,6 +18,10 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
 ctx.imageSmoothingEnabled = false;
 
+// How many device pixels one logical pixel covers right now. The scenes never see it:
+// render() installs it as the base transform and everything keeps drawing in 600x450 units.
+let renderScale = 1;
+
 // A scene is { enter(app, params), update(input), render(ctx), exit() }.
 const scenes = new Map();
 let current = null;
@@ -29,6 +34,7 @@ export const app = {
   canvas,
   ctx,
   bgColor: BG_COLOR,
+  renderScale: 1,
   scene: null,
   sceneName: null,
   assets: null,
@@ -53,8 +59,68 @@ export const app = {
 
 export function registerScene(name, scene) { scenes.set(name, scene); }
 
+// --- The backing store ----------------------------------------------------------------
+// The canvas is drawn at the resolution the display really has: its CSS box times the
+// device pixel ratio, capped by MAX_RENDER_SCALE. Resizing the window, dragging the window
+// onto a second monitor and a browser zoom all change that number, so all three are
+// watched and coalesced into one debounced update.
+const RESIZE_DEBOUNCE_MS = 100;
+let resizeTimer = 0;
+let dprQuery = null;
+
+function applyCanvasSize() {
+  const rect = typeof canvas.getBoundingClientRect === 'function' ? canvas.getBoundingClientRect() : null;
+  const dpr = typeof window !== 'undefined' && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+  const size = computeBackingSize(rect ? rect.width : W, rect ? rect.height : H, dpr);
+  if (canvas.width !== size.width || canvas.height !== size.height) {
+    // Resizing the backing store clears it and resets the context state; render() puts the
+    // base transform back before anything is drawn again.
+    canvas.width = size.width;
+    canvas.height = size.height;
+  }
+  renderScale = size.scale;
+  app.renderScale = size.scale;
+}
+
+// `(resolution: Xdppx)` only matches the ratio it was created with, so the query has to be
+// built again after every change to keep watching for the next one.
+function watchDevicePixelRatio() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+  if (dprQuery && typeof dprQuery.removeEventListener === 'function') {
+    dprQuery.removeEventListener('change', scheduleCanvasSize);
+  }
+  const dpr = window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+  try {
+    dprQuery = window.matchMedia(`(resolution: ${dpr}dppx)`);
+    if (typeof dprQuery.addEventListener === 'function') dprQuery.addEventListener('change', scheduleCanvasSize);
+  } catch {
+    dprQuery = null;   // a browser without `resolution` queries simply relies on resize
+  }
+}
+
+function scheduleCanvasSize() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    applyCanvasSize();
+    watchDevicePixelRatio();
+  }, RESIZE_DEBOUNCE_MS);
+}
+
+function watchCanvasSize() {
+  applyCanvasSize();
+  watchDevicePixelRatio();
+  window.addEventListener('resize', scheduleCanvasSize);
+  window.addEventListener('orientationchange', scheduleCanvasSize);
+  if (typeof ResizeObserver === 'function') {
+    // The stage is laid out from dvh and safe-area insets, which can change without a
+    // window resize event (the mobile URL bar sliding away).
+    new ResizeObserver(scheduleCanvasSize).observe(canvas);
+  }
+}
+
 // --- Boot ---------------------------------------------------------------------------
 async function boot() {
+  watchCanvasSize();
   app.assets = await loadAssets('assets/manifest.json');
   await ensurePixelFont(20);
   ctx.imageSmoothingEnabled = false;
@@ -79,6 +145,8 @@ async function boot() {
       app.input.endFrame();
     },
     render: () => {
+      // One logical pixel = `renderScale` device pixels, for every scene and every frame.
+      ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
       ctx.imageSmoothingEnabled = false;
       if (current && current.render) current.render(ctx);
     },
@@ -88,6 +156,7 @@ async function boot() {
 
 boot().catch((err) => {
   console.error('main: boot failed', err);
+  ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, W, H);
   drawText(ctx, 'LOADING FAILED', W / 2, H / 2, { size: 24, align: 'center' });

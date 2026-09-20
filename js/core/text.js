@@ -1,6 +1,8 @@
 // Pixel-font text drawing. The face is declared in css/style.css as @font-face "PixelFont"
 // (assets/fonts/pixel.ttf); monospace is the fallback if it fails to load.
 
+import { deviceScale, snapToDevice } from './canvas.js';
+
 export const FONT_FAMILY = "'PixelFont', monospace";
 
 // The face has asymmetric vertical metrics, so "middle" is not the middle of its em box.
@@ -67,7 +69,10 @@ export function drawText(ctx, str, x, y, {
     const box = glyphBox(ctx, s, size);
     drawY = baselineForCenter(y, box.ascent, box.descent);
   }
-  ctx.fillText(s, Math.round(x), Math.round(drawY));
+  // Snapped to the device pixel grid the canvas is really drawn on, so the glyphs stay
+  // hard-edged and cannot shimmer, whatever the window size and the display density are.
+  const scale = deviceScale(ctx);
+  ctx.fillText(s, snapToDevice(x, scale), snapToDevice(drawY, scale));
   ctx.restore();
 }
 

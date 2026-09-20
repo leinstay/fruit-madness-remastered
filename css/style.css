@@ -42,10 +42,11 @@ html, body {
 }
 
 /* 600x450 logical pixels, scaled to the largest 4:3 rectangle that fits the safe area:
-   in portrait that is the full width, centred vertically; in landscape the full height. */
+   in portrait that is the full width, centred vertically; in landscape the full height.
+   The backing store is sized to the device's own pixels in js/main.js, so the browser
+   never resamples the canvas and no image-rendering hint is needed (or wanted: the art is
+   drawn from its vector sources at the display's resolution). */
 canvas {
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
   display: block;
   width: var(--canvas-w);
   height: var(--canvas-h);
