@@ -224,6 +224,236 @@
     "logo": "assets/sprites/logo.png",
     "titleMadness": "assets/sprites/titleMadness.png"
   },
+  "vectors": {
+    "ufo": {
+      "frames": [
+        "assets/sprites/ufo_0.svg",
+        "assets/sprites/ufo_1.svg",
+        "assets/sprites/ufo_2.svg",
+        "assets/sprites/ufo_3.svg",
+        "assets/sprites/ufo_4.svg",
+        "assets/sprites/ufo_5.svg",
+        "assets/sprites/ufo_6.svg",
+        "assets/sprites/ufo_7.svg",
+        "assets/sprites/ufo_8.svg",
+        "assets/sprites/ufo_9.svg",
+        "assets/sprites/ufo_10.svg",
+        "assets/sprites/ufo_11.svg",
+        "assets/sprites/ufo_12.svg",
+        "assets/sprites/ufo_13.svg"
+      ],
+      "fps": 12,
+      "anchor": [
+        35.5,
+        34.5
+      ],
+      "size": [
+        71.1,
+        69.1
+      ]
+    },
+    "panda": {
+      "frames": [
+        "assets/sprites/panda_0.svg",
+        "assets/sprites/panda_1.svg",
+        "assets/sprites/panda_2.svg"
+      ],
+      "durations": [
+        35,
+        11,
+        24
+      ],
+      "anchor": [
+        13.5,
+        12.5
+      ],
+      "size": [
+        27,
+        25.05
+      ]
+    },
+    "cherry": {
+      "frames": [
+        "assets/sprites/cherry_0.svg",
+        "assets/sprites/cherry_1.svg"
+      ],
+      "durations": [
+        8,
+        14
+      ],
+      "anchor": [
+        23,
+        23
+      ],
+      "size": [
+        48,
+        48
+      ]
+    },
+    "muffin": {
+      "frames": [
+        "assets/sprites/muffin_0.svg",
+        "assets/sprites/muffin_1.svg"
+      ],
+      "durations": [
+        10,
+        20
+      ],
+      "anchor": [
+        16.5,
+        14
+      ],
+      "size": [
+        33,
+        28
+      ]
+    },
+    "dangerHz": {
+      "frames": [
+        "assets/sprites/dangerHz_0.svg",
+        "assets/sprites/dangerHz_1.svg",
+        "assets/sprites/dangerHz_2.svg",
+        "assets/sprites/dangerHz_3.svg",
+        "assets/sprites/dangerHz_4.svg",
+        "assets/sprites/dangerHz_5.svg",
+        "assets/sprites/dangerHz_6.svg",
+        "assets/sprites/dangerHz_7.svg"
+      ],
+      "fps": 30,
+      "anchor": [
+        144.45,
+        14
+      ],
+      "size": [
+        288.9,
+        31.75
+      ]
+    },
+    "dangerVt": {
+      "frames": [
+        "assets/sprites/dangerVt_0.svg",
+        "assets/sprites/dangerVt_1.svg",
+        "assets/sprites/dangerVt_2.svg",
+        "assets/sprites/dangerVt_3.svg",
+        "assets/sprites/dangerVt_4.svg",
+        "assets/sprites/dangerVt_5.svg",
+        "assets/sprites/dangerVt_6.svg",
+        "assets/sprites/dangerVt_7.svg"
+      ],
+      "fps": 30,
+      "anchor": [
+        12,
+        156.35
+      ],
+      "size": [
+        28.5,
+        307
+      ]
+    },
+    "dangerDiag": {
+      "file": "assets/sprites/dangerDiag.svg",
+      "notext": "assets/sprites/dangerDiag.notext.svg",
+      "anchor": [
+        29.35,
+        29.35
+      ],
+      "size": [
+        58.7,
+        60.5
+      ]
+    },
+    "star": {
+      "file": "assets/sprites/star.svg",
+      "anchor": [
+        2.5,
+        2.5
+      ],
+      "size": [
+        5,
+        5
+      ]
+    },
+    "fuelBar": {
+      "file": "assets/sprites/fuelBar.svg",
+      "notext": "assets/sprites/fuelBar.notext.svg",
+      "anchor": [
+        51.5,
+        30
+      ],
+      "size": [
+        103,
+        46.5
+      ]
+    },
+    "fuelFill": {
+      "file": "assets/sprites/fuelFill.svg",
+      "anchor": [
+        50,
+        15
+      ],
+      "size": [
+        100,
+        30
+      ]
+    },
+    "scoreBar": {
+      "file": "assets/sprites/scoreBar.svg",
+      "notext": "assets/sprites/scoreBar.notext.svg",
+      "anchor": [
+        51.45,
+        30
+      ],
+      "size": [
+        103,
+        47.2
+      ]
+    },
+    "gameOver": {
+      "file": "assets/sprites/gameOver.svg",
+      "notext": "assets/sprites/gameOver.notext.svg",
+      "anchor": [
+        300,
+        225
+      ],
+      "size": [
+        600,
+        450
+      ]
+    },
+    "btnStart": {
+      "file": "assets/sprites/btnStart.svg",
+      "anchor": [
+        63.7,
+        22.25
+      ],
+      "size": [
+        128.6,
+        50.75
+      ]
+    },
+    "btnPause": {
+      "file": "assets/sprites/btnPause.svg",
+      "anchor": [
+        50.5,
+        16.55
+      ],
+      "size": [
+        102,
+        40.1
+      ]
+    },
+    "btnMenu": {
+      "file": "assets/sprites/btnMenu.svg",
+      "anchor": [
+        42.55,
+        16.55
+      ],
+      "size": [
+        86.1,
+        40.1
+      ]
+    }
+  },
   "audio": {
     "mainTheme": "assets/audio/main-theme.mp3",
     "gameOver": "assets/audio/game-over.mp3",

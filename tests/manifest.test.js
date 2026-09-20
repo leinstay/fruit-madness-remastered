@@ -15,6 +15,7 @@ import { MODES } from '../js/game/modes.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets', 'manifest.json'), 'utf8'));
 const sprites = manifest.sprites;
+const vectors = manifest.vectors;
 
 /** Every file an entry refers to, whatever of the four forms it uses. */
 function filesOf(entry) {
@@ -92,6 +93,84 @@ test('the cherry is the size its hit radius implies', () => {
     const h = pngHeader(path.join(ROOT, rel));
     assert.ok(h.width >= ENEMY.SIZE && h.width <= 2 * ENEMY.SIZE, `${rel}: width ${h.width}`);
     assert.ok(h.height >= ENEMY.SIZE && h.height <= 2 * ENEMY.SIZE, `${rel}: height ${h.height}`);
+  }
+});
+
+/** The opening tag of an SVG file, where the viewport is declared. */
+function svgRoot(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  assert.ok(text.startsWith('<svg'), `${file}: must start with <svg`);
+  return { text, root: text.slice(0, text.indexOf('>') + 1) };
+}
+
+const attrOf = (tag, name) => {
+  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(tag);
+  return m ? m[1] : null;
+};
+
+test('every vector file exists and declares the viewport the manifest states', () => {
+  for (const [name, entry] of Object.entries(vectors)) {
+    const files = filesOf(entry);
+    assert.ok(files.length > 0, `vectors.${name} names no file`);
+    assert.ok(Array.isArray(entry.size) && entry.size.length === 2, `vectors.${name}: needs a size`);
+    if (entry.notext) files.push(entry.notext);
+    for (const rel of files) {
+      assert.ok(rel.endsWith('.svg'), `vectors.${name}: ${rel} is not an SVG`);
+      const file = path.join(ROOT, rel);
+      assert.ok(fs.existsSync(file), `vectors.${name}: missing ${rel}`);
+      const { root } = svgRoot(file);
+      const width = attrOf(root, 'width');
+      const height = attrOf(root, 'height');
+      const viewBox = attrOf(root, 'viewBox');
+      assert.ok(width && height && viewBox, `${rel}: needs width, height and viewBox`);
+      const box = viewBox.trim().split(/[\s,]+/).map(Number);
+      assert.equal(box.length, 4, `${rel}: malformed viewBox`);
+      assert.deepEqual([box[0], box[1]], [0, 0], `${rel}: the viewBox must start at the origin`);
+      assert.deepEqual([box[2], box[3]], [Number(width), Number(height)], `${rel}: viewBox and width/height disagree`);
+      assert.deepEqual([box[2], box[3]], entry.size, `${rel}: viewBox does not match vectors.${name}.size`);
+    }
+  }
+});
+
+test('every vector entry pins its registration point inside the frame', () => {
+  for (const [name, entry] of Object.entries(vectors)) {
+    assert.ok(Array.isArray(entry.anchor) && entry.anchor.length === 2, `vectors.${name}: needs an explicit anchor`);
+    const [x, y] = entry.anchor;
+    const [w, h] = entry.size;
+    assert.ok(x >= 0 && x <= w, `vectors.${name}: anchor x ${x} outside 0..${w}`);
+    assert.ok(y >= 0 && y <= h, `vectors.${name}: anchor y ${y} outside 0..${h}`);
+    if (Array.isArray(entry.durations)) {
+      assert.equal(entry.durations.length, entry.frames.length, `vectors.${name}: durations do not match frames`);
+    }
+  }
+  assert.deepEqual(vectors.panda.anchor, [13.5, 12.5]);
+  assert.deepEqual(vectors.ufo.anchor, [35.5, 34.5]);
+});
+
+test('every vector mirrors the sprite of the same name, frame for frame', () => {
+  for (const [name, entry] of Object.entries(vectors)) {
+    assert.ok(name in sprites, `vectors.${name} has no sprite to replace`);
+    const sprite = sprites[name];
+    assert.equal(filesOf(entry).length, filesOf(sprite).length, `vectors.${name}: frame count differs from the sprite`);
+    assert.equal(entry.fps ?? null, sprite.fps ?? null, `vectors.${name}: fps differs from the sprite`);
+    assert.deepEqual(entry.durations ?? null, sprite.durations ?? null, `vectors.${name}: durations differ from the sprite`);
+  }
+});
+
+test('the vector files carry nothing but drawable SVG', () => {
+  const ALLOWED_PREFIXED = new Set(['xmlns:xlink', 'xlink:href']);
+  for (const [name, entry] of Object.entries(vectors)) {
+    const files = filesOf(entry);
+    if (entry.notext) files.push(entry.notext);
+    for (const rel of files) {
+      const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+      for (const [, attr] of text.matchAll(/\s([a-zA-Z][\w.-]*:[\w.-]+)=/g)) {
+        assert.ok(ALLOWED_PREFIXED.has(attr), `${rel}: unexpected namespaced attribute ${attr}`);
+      }
+      if (rel.endsWith('.notext.svg')) {
+        assert.ok(!text.includes('font_'), `${rel}: still carries baked-in glyphs`);
+      }
+    }
   }
 });
 

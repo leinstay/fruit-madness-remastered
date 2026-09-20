@@ -6,18 +6,24 @@
 //   { "file": "path.png", "anchor": [x, y] }
 //   { "frames": [...], "fps": n, "anchor"?: [x, y] }
 //   { "frames": [...], "durations": [ticks...], "anchor"?: [x, y] }
-// `anchor` is in PNG pixels from the top-left; absent means the image centre.
+// `anchor` is in image pixels from the top-left; absent means the image centre.
+//
+// The manifest's "vectors" map uses the same forms for the SVG versions of the same
+// symbols, with two extra fields: `size` is the exact logical viewport [w, h] (fractional,
+// so the image centre is no longer a safe default and `anchor` is always spelled out), and
+// `notext` names a variant of the file with the baked-in caption removed.
 
 export function normalizeSpriteEntry(entry) {
   if (typeof entry === 'string') {
-    return { frames: [entry], timing: null, anchor: null };
+    return { frames: [entry], timing: null, anchor: null, size: null, notext: null };
   }
   if (!entry || typeof entry !== 'object') {
     throw new Error(`normalizeSpriteEntry: unsupported entry ${JSON.stringify(entry)}`);
   }
-  const anchor = Array.isArray(entry.anchor) && entry.anchor.length === 2
-    ? [Number(entry.anchor[0]), Number(entry.anchor[1])]
-    : null;
+  const pair = (value) => (Array.isArray(value) && value.length === 2 ? [Number(value[0]), Number(value[1])] : null);
+  const anchor = pair(entry.anchor);
+  const size = pair(entry.size);
+  const notext = typeof entry.notext === 'string' ? entry.notext : null;
 
   if (Array.isArray(entry.frames)) {
     if (entry.frames.length === 0) throw new Error('normalizeSpriteEntry: empty frames array');
@@ -31,11 +37,11 @@ export function normalizeSpriteEntry(entry) {
     } else if (typeof entry.fps === 'number' && entry.fps > 0) {
       timing = entry.fps;
     }
-    return { frames, timing, anchor };
+    return { frames, timing, anchor, size, notext };
   }
 
   if (typeof entry.file === 'string') {
-    return { frames: [entry.file], timing: null, anchor };
+    return { frames: [entry.file], timing: null, anchor, size, notext };
   }
   throw new Error(`normalizeSpriteEntry: entry has neither "frames" nor "file": ${JSON.stringify(entry)}`);
 }
@@ -55,7 +61,7 @@ function loadImage(url) {
 // Loads every sprite in the manifest. A missing or broken image never rejects the whole
 // load: it is logged and the sprite simply reports has(name) === false.
 export async function loadAssets(manifestUrl) {
-  let manifest = { sprites: {}, audio: {}, fonts: {} };
+  let manifest = { sprites: {}, vectors: {}, audio: {}, fonts: {} };
   try {
     const res = await fetch(manifestUrl, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -92,6 +98,17 @@ export async function loadAssets(manifestUrl) {
     }
   }
 
+  // The vector versions of the same symbols are only parsed, never fetched: the game still
+  // draws the images above. Rendering will pick them up from here in its own step.
+  const vectors = new Map();
+  for (const [name, entry] of Object.entries(manifest.vectors || {})) {
+    try {
+      vectors.set(name, normalizeSpriteEntry(entry));
+    } catch (err) {
+      console.warn(`assets: skipping vector "${name}":`, err);
+    }
+  }
+
   const has = (name) => sprites.has(name);
   const img = (name, frame = 0) => {
     const record = sprites.get(name);
@@ -104,7 +121,7 @@ export async function loadAssets(manifestUrl) {
   const timing = (name) => (sprites.has(name) ? sprites.get(name).timing : null);
   const anchor = (name) => (sprites.has(name) ? sprites.get(name).anchor : null);
 
-  return { img, has, frameCount, timing, anchor, manifest };
+  return { img, has, frameCount, timing, anchor, vectors, manifest };
 }
 
 // Draws one frame so that the sprite's anchor (its centre when there is no anchor)

@@ -66,7 +66,7 @@ browsers refuse to load over `file://`.
 ### Tests
 
 ```bash
-node --test tests/          # 142 tests, about 90 seconds
+node --test tests/          # 149 tests, about 90 seconds
 ```
 
 The long survivability proof is opt-in, because it is slow:
@@ -112,7 +112,7 @@ js/
   services/         the Firestore leaderboard client
 assets/             sprites, font, music and sound effects
 tests/              node --test suites, including the survivability simulator
-tools/              the sprite-building script
+tools/              the scripts that build the sprites and prepare the vector ones
 firestore.rules     the leaderboard security rules
 ```
 
