@@ -12,6 +12,7 @@ import { W, H } from '../config.js';
 import { drawSprite } from '../core/assets.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
+import { drawButtonCaption } from './captions.js';
 import { createButtons, drawButton, drawMarker } from './ui.js';
 
 // The flat navy the title art uses behind the labels (sampled from titleBg_0.png).
@@ -82,9 +83,10 @@ export function createMenuScene() {
     c.fillRect(VERSION_BOX.x, VERSION_BOX.y, VERSION_BOX.w, VERSION_BOX.h);
     drawText(c, VERSION_TEXT, 4, 4, { size: 12, baseline: 'top' });
 
-    // START keeps the original sprite; the other two are pixel-font labels in its style.
+    // START is the original 40 px caption of the `btnStart` symbol, drawn where that symbol
+    // put it; the other two are pixel-font labels in the same style.
     const start = buttons.byId('start');
-    drawSprite(c, assets, 'btnStart', 0, start.x + start.w / 2, start.y + start.h / 2 + 3);
+    drawButtonCaption(c, 'btnStart', start.x + start.w / 2, start.y + start.h / 2 + 3);
     if (buttons.isSelected('start')) drawMarker(c, start, 22);
 
     drawButton(c, buttons.byId('board'), buttons.isSelected('board'));

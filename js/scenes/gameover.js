@@ -10,6 +10,7 @@ import { validateNick } from '../game/nick.js';
 import { submitScore } from '../services/leaderboard.js';
 import { createStarfield } from './starfield.js';
 import { drawWorldSprites } from './game-hud.js';
+import { drawGameOverTitle } from './captions.js';
 import { createButtons, drawButton } from './ui.js';
 
 const NICK_KEY = 'fm.nick';
@@ -130,8 +131,9 @@ export function createGameOverScene() {
     drawWorldSprites(c, assets, world);
     if (explosion) explosion.render(c);
 
-    // The extracted sprite carries the letterbox bars and the "Game Over" lettering.
+    // The symbol supplies the two black letterbox bars; the lettering is drawn.
     drawSprite(c, assets, 'gameOver', 0, W / 2, H / 2);
+    drawGameOverTitle(c, W / 2, H / 2);
     const shown = Math.min(SCORE_MAX, Math.max(0, Math.floor(score)));
     drawText(c, `SCORE: ${String(shown).padStart(7, '0')}`, W / 2, SCORE_Y, { size: 24, align: 'center' });
     const caption = submitted ? 'SCORE SENT' : 'ENTER YOUR NAME';

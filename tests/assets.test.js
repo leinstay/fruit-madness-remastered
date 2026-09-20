@@ -69,13 +69,23 @@ test('a sprite whose vector carries no text is drawn from the vector', () => {
     { kind: 'vector', frames: ['cherry_0.svg', 'cherry_1.svg'], timing: 12, anchor: [23, 23], size: [48, 48] });
 });
 
-test('art with a baked-in caption stays raster until the captions are drawn at runtime', () => {
+test('art with a baked-in caption is drawn from the variant without it', () => {
   const spec = normalizeSpriteEntry({ file: 'scoreBar.png', anchor: [51.5, 30] });
   const withCaption = normalizeSpriteEntry({ file: 'scoreBar.svg', notext: 'scoreBar.notext.svg', anchor: [51.45, 30], size: [103, 47.2] });
+  const source = spriteSource(spec, withCaption);
+  assert.equal(source.kind, 'vector');
+  assert.deepEqual(source.frames, ['scoreBar.notext.svg']);
+  assert.deepEqual(source.anchor, [51.45, 30]);
+});
+
+test('a symbol that is nothing but its caption loads no file at all, but keeps its box', () => {
+  const spec = normalizeSpriteEntry({ file: 'btnStart.png', anchor: [63.7, 22.25] });
   const allCaption = normalizeSpriteEntry({ file: 'btnStart.svg', anchor: [63.7, 22.25], size: [128.6, 50.75], textOnly: true });
-  assert.equal(spriteSource(spec, withCaption).kind, 'raster');
-  assert.equal(spriteSource(spec, allCaption).kind, 'raster');
-  assert.deepEqual(spriteSource(spec, withCaption).frames, ['scoreBar.png']);
+  const source = spriteSource(spec, allCaption);
+  assert.equal(source.kind, 'none');
+  assert.deepEqual(source.frames, []);
+  assert.deepEqual(source.size, [128.6, 50.75]);
+  assert.deepEqual(source.anchor, [63.7, 22.25]);
 });
 
 test('a vector entry without a usable size is not trusted', () => {

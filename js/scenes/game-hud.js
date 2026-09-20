@@ -7,6 +7,9 @@ import { deviceScale, snapToDevice } from '../core/canvas.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
 import { comboDrain, drainSplitY } from '../game/combo.js';
+import {
+  drawButtonCaption, drawCapsuleCaption, drawDangerStrip, drawDangerMark, dangerAlpha,
+} from './captions.js';
 import { expandRect, MIN_TOUCH_SIZE } from './ui.js';
 
 // Positions of the original HUD (GameLoop.as); all three capsules sit on the same row.
@@ -62,6 +65,7 @@ function drawScaled(ctx, assets, name, index, x, y, scaleX, scaleY = scaleX) {
 
 function drawFuel(ctx, assets, fuelValue) {
   drawSprite(ctx, assets, 'fuelBar', 0, FUEL_BAR.x, FUEL_BAR.y);
+  drawCapsuleCaption(ctx, 'fuelBar', FUEL_BAR.x, FUEL_BAR.y);
   const ratio = Math.max(0, Math.min(1, fuelValue / FUEL.MAX));
   if (assets.has('fuelFill')) {
     // As in the 2013 original (`fuelCount.scaleX = fuel / 100`), the fill shrinks about its
@@ -84,6 +88,7 @@ const SCORE_TEXT_DY = 0.5;
 
 function drawScore(ctx, assets, score) {
   drawSprite(ctx, assets, 'scoreBar', 0, SCORE_BAR.x, SCORE_BAR.y);
+  drawCapsuleCaption(ctx, 'scoreBar', SCORE_BAR.x, SCORE_BAR.y);
   const shown = Math.min(SCORE_MAX, Math.max(0, Math.floor(score)));
   drawText(ctx, String(shown).padStart(7, '0'), SCORE_BAR.x, SCORE_BAR.y + SCORE_TEXT_DY, {
     size: 16, align: 'center', color: '#fff', valign: 'center',
@@ -128,7 +133,10 @@ function drawCellBand(ctx, assets, x, rect, top, height, alpha) {
 }
 
 function drawCombo(ctx, assets, combo) {
-  drawSprite(ctx, assets, 'comboBar', 0, COMBO_BAR.x, COMBO_BAR.y);
+  // The 2013 combo symbol has its four muffins and its "not working yet :(" line baked in,
+  // so the capsule is the score bar's — they are the same shape — and the caption is drawn.
+  drawSprite(ctx, assets, 'scoreBar', 0, COMBO_BAR.x, COMBO_BAR.y);
+  drawCapsuleCaption(ctx, 'comboBar', COMBO_BAR.x, COMBO_BAR.y);
   const x0 = COMBO_BAR.x - ((COMBO.CELLS - 1) * COMBO_CELL_PITCH) / 2;
   for (let i = 0; i < COMBO.CELLS; i++) {
     const x = x0 + i * COMBO_CELL_PITCH;
@@ -175,16 +183,24 @@ export function drawHud(ctx, assets, { fuel, score, combo, frame }) {
 }
 
 export function drawButtons(ctx, assets) {
-  drawSprite(ctx, assets, 'btnPause', 0, BTN_PAUSE.x, BTN_PAUSE.y);
-  drawSprite(ctx, assets, 'btnMenu', 0, BTN_MENU.x, BTN_MENU.y);
+  drawButtonCaption(ctx, 'btnPause', BTN_PAUSE.x, BTN_PAUSE.y);
+  drawButtonCaption(ctx, 'btnMenu', BTN_MENU.x, BTN_MENU.y);
 }
 
-/** The DANGER signs announcing the next attack side, blinking at 2 Hz. */
+/**
+ * The DANGER signs announcing the next attack side, blinking at 2 Hz. The two strips are
+ * their lettering and nothing else, and their own flash is the alpha ramp of the original
+ * timeline; the diagonal sign is a red ring with an exclamation mark inside it.
+ */
 export function drawWarnings(ctx, assets, warnings, frame) {
   if (!warnings || warnings.length === 0 || !blinkOn(frame)) return;
   for (const wn of warnings) {
-    const f = frameAt(assets.timing(wn.sprite), assets.frameCount(wn.sprite), frame);
-    drawSprite(ctx, assets, wn.sprite, f, wn.x, wn.y);
+    if (wn.sprite === 'dangerDiag') {
+      drawSprite(ctx, assets, wn.sprite, 0, wn.x, wn.y);
+      drawDangerMark(ctx, wn.x, wn.y);
+      continue;
+    }
+    drawDangerStrip(ctx, wn.sprite, assets.size(wn.sprite), assets.anchor(wn.sprite), wn.x, wn.y, dangerAlpha(frame));
   }
 }
 

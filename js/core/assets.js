@@ -57,16 +57,20 @@ export function normalizeSpriteEntry(entry) {
  *   'vector'  the SVG frames, rasterised once per device scale (the art is resolution-free)
  *   'raster'  the PNG frames, blitted unsmoothed
  *
- * A vector whose art is nothing but a caption (`textOnly`), or whose caption is stripped
- * into a `notext` variant, keeps its 2013 render until the captions are drawn at runtime:
- * the glyph outlines in the exported art are not laid out on the font's own advances.
+ *   'none'    nothing is loaded: the symbol is nothing but its caption (`textOnly`), which
+ *             js/scenes/captions.js draws in the game's own font
+ *
+ * A symbol that carries both art and a caption ships a `notext` variant; that variant is
+ * what gets drawn, and the caption is drawn over it at runtime.
  */
 export function spriteSource(spec, vector) {
   const usable = vector && Array.isArray(vector.size) && vector.size[0] > 0 && vector.size[1] > 0;
-  if (!usable || vector.textOnly || vector.notext) {
+  if (!usable) {
     return { kind: 'raster', frames: spec.frames, timing: spec.timing, anchor: spec.anchor, size: null };
   }
-  return { kind: 'vector', frames: vector.frames, timing: vector.timing, anchor: vector.anchor, size: vector.size };
+  if (vector.textOnly) return { kind: 'none', frames: [], timing: null, anchor: vector.anchor, size: vector.size };
+  const frames = vector.notext ? [vector.notext] : vector.frames;
+  return { kind: 'vector', frames, timing: vector.timing, anchor: vector.anchor, size: vector.size };
 }
 
 /** The offscreen bitmap one vector frame needs at `scale`, in whole device pixels. */
@@ -156,6 +160,7 @@ export async function loadAssets(manifestUrl) {
     }
     specs.set(name, spec);
     const source = spriteSource(spec, vectors.get(name) || null);
+    if (source.kind === 'none') continue;   // drawn as text, nothing to fetch
     const record = {
       kind: source.kind,
       images: new Array(source.frames.length).fill(null),
@@ -256,10 +261,17 @@ export async function loadAssets(manifestUrl) {
     };
   };
 
-  /** The logical size of a sprite: its vector viewport, or the natural size of its PNG. */
+  /**
+   * The logical size of a sprite: its vector viewport, or the natural size of its PNG.
+   * A symbol that is drawn as text has no frames but still has a box — the scenes lay their
+   * buttons and their tap targets out on it.
+   */
   const size = (name) => {
     const record = sprites.get(name);
-    if (!record) return null;
+    if (!record) {
+      const spec = vectors.get(name);
+      return spec && spec.size ? spec.size.slice() : null;
+    }
     if (record.size) return record.size.slice();
     const image = record.images[0];
     return image && image.width ? [image.width, image.height] : null;
@@ -269,8 +281,11 @@ export async function loadAssets(manifestUrl) {
   const timing = (name) => (sprites.has(name) ? sprites.get(name).timing : null);
   const anchor = (name) => {
     const record = sprites.get(name);
-    if (!record) return null;
-    if (record.anchor) return record.anchor;
+    if (record && record.anchor) return record.anchor;
+    if (!record) {
+      const spec = vectors.get(name);
+      if (spec && spec.anchor) return spec.anchor;
+    }
     const wh = size(name);
     return wh ? [wh[0] / 2, wh[1] / 2] : null;
   };

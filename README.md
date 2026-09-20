@@ -18,7 +18,9 @@ is built in the spirit of NES-era arcade games.
 The original *Fruit Madness* was a Flash game we made in 2013
 ([leinstay/fruitmadness](https://github.com/leinstay/fruitmadness), ActionScript 3). Flash is gone, so this
 is a from-scratch HTML5 remaster: the same physics constants, the same sprites and the same music, rewritten
-in plain JavaScript with no plugin, no build step and no dependencies.
+in plain JavaScript with no plugin, no build step and no dependencies. The playfield is drawn from the
+original vector artwork at whatever resolution your display really has, and every caption is set in the
+game's own pixel font, so the game stays sharp in any window.
 
 ![The title screen](assets/readme/title.png)
 
@@ -66,7 +68,7 @@ browsers refuse to load over `file://`.
 ### Tests
 
 ```bash
-node --test tests/          # 149 tests, about 90 seconds
+node --test tests/          # 180 tests, about 90 seconds
 ```
 
 The long survivability proof is opt-in, because it is slow:
