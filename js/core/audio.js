@@ -123,14 +123,22 @@ export function createAudio(baseUrl, manifestAudio = {}, opts = {}) {
     }
   }
 
-  function music(name, { loop = true } = {}) {
+  /**
+   * Requests a track. `restart: true` takes the current track back to its beginning even
+   * when it is already the one playing — what the menu asks for when the player comes back
+   * from a run. Without it, re-requesting the current track never disturbs its position.
+   */
+  function music(name, { loop = true, restart = false } = {}) {
     if (wanted && wanted.name === name) {
+      const same = element(name);
       if (wanted.loop !== loop) {
         wanted.loop = loop;
-        const same = element(name);
         if (same) same.loop = loop;
       }
-      applyMusicState();   // already the current track: never restarted
+      // Rewinding a silenced track (muted, paused, before the gesture) is still right: it
+      // is where it will start from once it is allowed to play.
+      if (restart && same) rewind(same);
+      applyMusicState();
       return;
     }
     stopMusic();

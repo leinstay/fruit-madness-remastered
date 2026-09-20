@@ -63,7 +63,8 @@ export function createGameScene() {
     if (rectHit(buttonRect(app.assets, 'btnPause', BTN_PAUSE), p)) {
       if (!dying) setPaused(!paused);
     } else if (rectHit(buttonRect(app.assets, 'btnMenu', BTN_MENU), p)) {
-      app.go('menu');
+      // The title screen restarts the theme when it is entered from a run.
+      app.go('menu', { from: 'game' });
       return true;
     }
     return false;
@@ -155,9 +156,11 @@ export function createGameScene() {
     },
     update,
     render,
-    // The HUD buttons only exist in this scene, so the exclusions leave with it.
+    // The HUD buttons only exist in this scene, so the exclusions leave with it — and so
+    // does the pause: leaving while paused must not keep the next scene's music silent.
     exit() {
       if (app && app.input) app.input.setTouchExclusions([]);
+      if (app && app.audio) app.audio.resumeMusic();
     },
     // Exposed for debugging from the console and for the browser check.
     get state() { return { world, player, fuel, combo, score, paused, dying }; },

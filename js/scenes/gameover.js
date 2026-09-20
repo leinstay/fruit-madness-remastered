@@ -118,7 +118,7 @@ export function createGameOverScene() {
     // so typing never moves the selection or activates a button.
     const activated = buttons.update(inputState);
     if (activated === 'retry') app.go('game');
-    else if (activated === 'menu') app.go('menu');
+    else if (activated === 'menu') app.go('menu', { from: 'gameover' });
   }
 
   function render(c) {

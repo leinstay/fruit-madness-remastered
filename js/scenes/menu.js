@@ -35,6 +35,11 @@ const BTN_SOUND = { id: 'sound', x: 504, y: 24, w: 92, h: 18, size: 12, marker: 
 
 const MUTED_KEY = 'fm.muted';
 
+// Which scenes count as "coming back from a run": arriving from one of them plays the theme
+// from its beginning again, as the original did. Booting, or stepping back from the
+// leaderboard — a sub-screen of this menu — leaves the music exactly where it is.
+const RUN_SCENES = ['game', 'gameover'];
+
 /**
  * localStorage is read lazily and defensively: it throws when site data is blocked.
  * js/core/audio.js owns the same key; these two helpers are the fallback used when the
@@ -114,7 +119,7 @@ export function createMenuScene() {
   }
 
   return {
-    enter(theApp) {
+    enter(theApp, params = {}) {
       app = theApp;
       tick = 0;
       muted = app.audio ? app.audio.muted : readMuted();
@@ -127,7 +132,8 @@ export function createMenuScene() {
       timing = layered ? layered.durations : null;
       // There is only one music track, and adding another is not allowed, so the title
       // screen plays the same theme the game does; entering the game does not restart it.
-      if (app.audio) app.audio.music('mainTheme');
+      // Leaving a run for the title screen does, which is where `from` comes in.
+      if (app.audio) app.audio.music('mainTheme', { restart: RUN_SCENES.includes(params.from) });
     },
     update,
     render,

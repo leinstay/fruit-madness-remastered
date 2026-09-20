@@ -120,6 +120,55 @@ test('music() for the track that is already playing does not restart it', () => 
   assert.equal(theme.currentTime, 12.5);
 });
 
+test('music() with restart rewinds the track that is already playing', () => {
+  const { audio, els } = setup();
+  audio.arm();
+  audio.music('mainTheme');
+  const theme = els.find('main-theme');
+  theme.currentTime = 12.5;
+  audio.music('mainTheme', { restart: true });
+  assert.equal(theme.currentTime, 0, 'the theme starts over');
+  assert.equal(theme.paused, false, 'and keeps playing');
+});
+
+test('music() with restart before the first gesture still starts at zero when armed', () => {
+  const { audio, els } = setup();
+  audio.music('mainTheme', { restart: true });
+  const theme = els.find('main-theme');
+  assert.equal(theme.playCalls, 0, 'nothing plays before a gesture');
+  audio.arm();
+  assert.equal(theme.paused, false);
+  assert.equal(theme.currentTime, 0);
+});
+
+test('music() with restart rewinds a track the scene has paused, without resuming it', () => {
+  const { audio, els } = setup();
+  audio.arm();
+  audio.music('mainTheme');
+  const theme = els.find('main-theme');
+  theme.currentTime = 20;
+  audio.pauseMusic();
+  audio.music('mainTheme', { restart: true });
+  assert.equal(theme.currentTime, 0);
+  assert.equal(theme.paused, true, 'a paused scene stays silent');
+  audio.resumeMusic();
+  assert.equal(theme.paused, false);
+  assert.equal(theme.currentTime, 0);
+});
+
+test('muting and unmuting never restart the music', () => {
+  const { audio, els } = setup();
+  audio.arm();
+  audio.music('mainTheme');
+  const theme = els.find('main-theme');
+  theme.currentTime = 33;
+  audio.setMuted(true);
+  assert.equal(theme.currentTime, 33, 'muting does not rewind');
+  audio.setMuted(false);
+  assert.equal(theme.currentTime, 33, 'unmuting resumes where it stopped');
+  assert.equal(theme.paused, false);
+});
+
 test('switching tracks stops the old one and starts the new one from the beginning', () => {
   const { audio, els } = setup();
   audio.arm();
@@ -290,6 +339,7 @@ test('hiding the tab pauses the music and showing it again resumes', () => {
   doc.hidden = false;
   doc.fire('visibilitychange');
   assert.equal(theme.paused, false);
+  assert.equal(theme.currentTime, 9, 'showing it again does not rewind either');
 });
 
 test('a hidden tab does not resume music that is muted or stopped', () => {
