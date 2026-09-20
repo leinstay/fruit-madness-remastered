@@ -1,8 +1,8 @@
 // The title screen: the original illustrated 600x450 `titleBg` animation, drawn from the
 // vector artwork of the 2013 source document and played at its recorded per-frame
-// durations, with the original START button caption and two added controls (LEADERBOARD,
-// SOUND ON/OFF) laid out over the parts of the artwork that are pure background in all
-// 31 frames.
+// durations slowed by `TITLE_SLOWDOWN`, with the original START button caption and two
+// added controls (LEADERBOARD, SOUND ON/OFF) laid out over the parts of the artwork that
+// are pure background in all 31 frames.
 //
 // Part of every `titleBg` frame: the "FRUIT" logo, the rainbow "madness" banner and the
 // whole cast. The two labels are not — like every other caption in the game they are text
@@ -10,8 +10,7 @@
 // positions the source document gives them.
 // "START" is not part of the artwork either: it is the caption of the `btnStart` symbol.
 import { W, H } from '../config.js';
-import { createTitleFrames } from '../core/title-frames.js';
-import { frameAt } from '../core/anim.js';
+import { createTitleFrames, titleKeyframeAt } from '../core/title-frames.js';
 import { drawText } from '../core/text.js';
 import { drawButtonCaption } from './captions.js';
 import { createButtons, drawButton, drawMarker } from './ui.js';
@@ -96,7 +95,7 @@ export function createMenuScene() {
   }
 
   function render(c) {
-    drawTitle(c, frameAt(timing, frames, tick));
+    drawTitle(c, titleKeyframeAt(timing, frames, tick));
 
     for (const label of LABELS) {
       drawText(c, label.text, label.x, label.y, { size: LABEL_SIZE, align: 'center' });

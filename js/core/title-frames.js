@@ -45,6 +45,21 @@
 
 import { W, H } from '../config.js';
 import { rasterFrameSize } from './assets.js';
+import { frameAt } from './anim.js';
+
+/** How many game ticks one tick of the recorded title loop lasts. */
+// The original loop runs twice as fast; slowed on purpose.
+export const TITLE_SLOWDOWN = 2;
+
+/**
+ * Which keyframe of the title stands on game tick `tick`: the recorded playback, stretched
+ * over `slowdown` times as many ticks. The whole loop is 40 recorded ticks and therefore
+ * 80 game ticks; no keyframe is skipped, each is simply held twice as long.
+ */
+export function titleKeyframeAt(durations, frameCount, tick, slowdown = TITLE_SLOWDOWN) {
+  const n = Math.max(1, Math.floor(slowdown) || 1);
+  return frameAt(durations, frameCount, Math.floor(tick / n));
+}
 
 /**
  * The render scale a title frame is ever rasterised at. The field is 600x450, so scale 3

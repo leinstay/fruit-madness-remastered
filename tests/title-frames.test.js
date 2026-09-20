@@ -12,8 +12,9 @@ import {
   sliceTitleFrames, buildFrameParts, buildFrameDocument, buildFullFrameDocument,
   referencedIds, resolveDefinitions, createTitleFrames,
   tileGrid, changedTiles, packPatchAtlas, preparationOrder, shownKeyframe,
-  projectedCacheBytes, nextTitleScale, titleCacheScale,
+  projectedCacheBytes, nextTitleScale, titleCacheScale, titleKeyframeAt,
   TILE_SIZE, TILE_TOLERANCE, MAX_TITLE_SCALE, TITLE_SCALE_STEPS, TITLE_CACHE_BUDGET_BYTES,
+  TITLE_SLOWDOWN,
 } from '../js/core/title-frames.js';
 import { frameAt } from '../js/core/anim.js';
 
@@ -435,9 +436,44 @@ test('the keyframes follow the manifest durations, 31 of them per 40 ticks', () 
     assert.equal(shown.filter((f) => f === i).length, durations[i], `keyframe ${i} holds`);
   }
   assert.equal(frameAt(durations, frameCount, loop), 0, 'and then it starts again');
+  // At the speed the game plays it, that same loop takes twice as many ticks.
+  assert.equal(loop * TITLE_SLOWDOWN, 80);
   // Which is why the cache has to hold the whole loop: at 60 Hz the animation asks for a
   // different keyframe 46.5 times a second, and each one costs ~19 ms to rasterise.
   assert.equal((60 * frameCount) / loop, 46.5);
+});
+
+// --- game ticks to title keyframes --------------------------------------------------------
+
+test('the title plays at half the speed the artwork records', () => {
+  assert.equal(TITLE_SLOWDOWN, 2);
+  const durations = [2, 1, 3];
+  const frames = 3;
+  // At slowdown 1 the mapping is the recorded playback itself.
+  for (let tick = -8; tick < 20; tick += 1) {
+    assert.equal(titleKeyframeAt(durations, frames, tick, 1), frameAt(durations, frames, tick), `tick ${tick}`);
+  }
+  // At slowdown 2 every keyframe is held for twice as many game ticks, in the same order.
+  const shown = [];
+  for (let tick = 0; tick < 12; tick += 1) shown.push(titleKeyframeAt(durations, frames, tick, 2));
+  assert.deepEqual(shown, [0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2]);
+  assert.equal(titleKeyframeAt(durations, frames, 12, 2), 0, 'and then the loop starts again');
+  assert.equal(titleKeyframeAt(durations, frames, 0, 0), frameAt(durations, frames, 0), 'a silly slowdown is ignored');
+});
+
+test('the shipped title loop takes 80 game ticks and skips no keyframe', () => {
+  const { durations, frameCount } = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')).sprites.titleBg;
+  const loop = durations.reduce((a, b) => a + b, 0) * TITLE_SLOWDOWN;
+  assert.equal(loop, 80);
+  const shown = [];
+  for (let tick = 0; tick < loop; tick += 1) shown.push(titleKeyframeAt(durations, frameCount, tick));
+  assert.deepEqual([...new Set(shown)], durations.map((_, i) => i), 'all 31, in order, none skipped');
+  for (let i = 0; i < frameCount; i += 1) {
+    assert.equal(shown.filter((f) => f === i).length, durations[i] * TITLE_SLOWDOWN, `keyframe ${i} holds`);
+  }
+  assert.equal(titleKeyframeAt(durations, frameCount, loop), 0);
+  // 31 keyframes per 80 ticks: 23.25 changes a second instead of 46.5.
+  assert.equal((60 * frameCount) / loop, 23.25);
 });
 
 // --- the composed keyframe ---------------------------------------------------------------
