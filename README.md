@@ -68,7 +68,7 @@ browsers refuse to load over `file://`.
 ### Tests
 
 ```bash
-node --test tests/          # 218 tests, about two minutes
+node --test tests/          # 241 tests, about two minutes
 ```
 
 The long survivability proof is opt-in, because it is slow:
@@ -125,6 +125,8 @@ firestore.rules     the leaderboard security rules
 ## Credits
 
 Game, art and music by **Niruin & Fenion** — the Flash original in 2013–2014, this HTML5 remaster in 2026.
+
+The pixel font is **04b03** by Yuji Oshimoto (04.jp.org), a freeware font.
 
 ## License
 
