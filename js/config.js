@@ -8,7 +8,7 @@ export const DIRECTOR = { ATTACK_FRAMES: 900, WARNING_FRAMES: 300, START_DIFFICU
   DOUBLE_FROM_SHIFT: 4, DOUBLE_MAX_CHANCE: 0.4 };
 export const SUGAR = { INTERVAL: 100, SPEED_MIN: 3, SPEED_MAX: 4, HIT_R: 12, SIZE: 24 };
 export const ENEMY = { SIZE: 30, HIT_R: 13 };
-export const COMBO = { CELLS: 4, FULL_BONUS: 500 };
+export const COMBO = { CELLS: 4, CELL_FRAMES: 240, MUFFIN_POINTS: 100 };
 export const NICK = { MIN: 3, MAX: 6, RE: /^[A-Za-z0-9]+$/ };   // mirrors ^[A-Za-z0-9]{3,6}$ in firestore.rules
 export const SCORE_MAX = 9999999;
 export const AUDIO_BASE_URL = 'assets/audio/';

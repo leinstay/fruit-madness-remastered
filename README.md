@@ -32,9 +32,10 @@ in plain JavaScript with no plugin, no build step and no dependencies.
 - **Fuel.** The tank holds 100 units and drains by 0.05 per frame — about 33 seconds of flight. Every muffin
   gives back 10. Run dry and the saucer does not die, it crawls: top speed drops from 6 to 0.5 px per frame
   and you are a sitting duck.
-- **Combo.** Four muffins in a row fill the combo bar, and every filled cell raises the score multiplier
-  (up to ×5). A full bar pays a flat 500-point bonus for every further muffin. Let one muffin fly off the
-  screen and the bar resets to zero.
+- **Combo.** Every muffin lights one of the four cells of the combo bar, and every lit cell raises the score
+  multiplier (up to ×5). A muffin is worth 100 points times the multiplier it has just raised — 200 for the
+  first one, 500 on a full bar. The bar does not last: cells burn down one at a time from the right, four
+  seconds each, so keep the muffins coming. Missing one costs you nothing but the fuel.
 - **DANGER.** Attacks come in cycles: 15 seconds of one attack, then a 5-second warning that flashes on the
   edge the next wave will come from. Waves come faster and faster, and later on two perpendicular sides can
   attack at once.
@@ -46,7 +47,7 @@ in plain JavaScript with no plugin, no build step and no dependencies.
 - Original pixel art and music from the 2013 game.
 - Attack formations that are always dodgeable — never a wall you could not have slipped through.
 - Eight attack directions and double-sided attacks that come in from two edges at once.
-- Fuel, a four-cell combo multiplier and a seven-digit score.
+- Fuel, a four-cell combo multiplier that decays over time and a seven-digit score.
 - Online top-10 leaderboard.
 - Keyboard on desktop, floating touch joystick on mobile.
 - Zero dependencies and no build step; the game also runs fine if the audio fails to load.
@@ -65,7 +66,7 @@ browsers refuse to load over `file://`.
 ### Tests
 
 ```bash
-node --test tests/          # 124 tests, about 90 seconds
+node --test tests/          # 132 tests, about 90 seconds
 ```
 
 The long survivability proof is opt-in, because it is slow:

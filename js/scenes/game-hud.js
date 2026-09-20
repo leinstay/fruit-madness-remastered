@@ -5,7 +5,7 @@ import { W, H, FUEL, COMBO, SCORE_MAX } from '../config.js';
 import { drawSprite } from '../core/assets.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
-import { comboMultiplier } from '../game/combo.js';
+import { comboDrain, drainSplitY } from '../game/combo.js';
 import { expandRect, MIN_TOUCH_SIZE } from './ui.js';
 
 // Positions of the original HUD (GameLoop.as); all three capsules sit on the same row.
@@ -69,23 +69,42 @@ function drawScore(ctx, assets, score) {
 
 // The combo capsule: the redrawn `comboBar` frame — empty, and the same shape as the fuel
 // and score bars — with four `comboCell` muffin icons inside it. A filled cell is drawn
-// solid, an empty one dimmed. The multiplier sits under the capsule, where the 2013
-// original printed its "not working yet :(" line.
+// solid, an empty one dimmed. The rightmost filled cell is the running timer: it burns
+// down from the top, so it fades into an empty cell just as it goes out.
 const COMBO_CELL_PITCH = 21;
-const COMBO_LABEL_DY = 26;
+const COMBO_DIM_ALPHA = 0.22;
+
+/** Draws the muffin icon clipped to the rows [top, top + height) of its own rectangle. */
+function drawCellBand(ctx, assets, x, rect, top, height, alpha) {
+  if (height <= 0) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rect.x, top, rect.w, height);
+  ctx.clip();
+  ctx.globalAlpha = alpha;
+  drawSprite(ctx, assets, 'comboCell', 0, x, COMBO_BAR.y);
+  ctx.restore();
+}
 
 function drawCombo(ctx, assets, combo) {
   drawSprite(ctx, assets, 'comboBar', 0, COMBO_BAR.x, COMBO_BAR.y);
   const x0 = COMBO_BAR.x - ((COMBO.CELLS - 1) * COMBO_CELL_PITCH) / 2;
   for (let i = 0; i < COMBO.CELLS; i++) {
+    const x = x0 + i * COMBO_CELL_PITCH;
+    const filled = i < combo.cells;
+    if (filled && i === combo.cells - 1) {
+      // The draining cell: lit below the split line, dimmed above it.
+      const rect = spriteRect(assets, 'comboCell', x, COMBO_BAR.y);
+      const split = drainSplitY(rect.y, rect.h, comboDrain(combo));
+      drawCellBand(ctx, assets, x, rect, rect.y, split - rect.y, COMBO_DIM_ALPHA);
+      drawCellBand(ctx, assets, x, rect, split, rect.y + rect.h - split, 1);
+      continue;
+    }
     ctx.save();
-    ctx.globalAlpha = i < combo.cells ? 1 : 0.22;
-    drawSprite(ctx, assets, 'comboCell', 0, x0 + i * COMBO_CELL_PITCH, COMBO_BAR.y);
+    ctx.globalAlpha = filled ? 1 : COMBO_DIM_ALPHA;
+    drawSprite(ctx, assets, 'comboCell', 0, x, COMBO_BAR.y);
     ctx.restore();
   }
-  drawText(ctx, `x${comboMultiplier(combo)}`, COMBO_BAR.x, COMBO_BAR.y + COMBO_LABEL_DY, {
-    size: 14, align: 'center',
-  });
 }
 
 /**

@@ -7,7 +7,7 @@ import { frameAt } from '../core/anim.js';
 import { createWorld, stepWorld } from '../game/world.js';
 import { createPlayer, stepPlayer } from '../game/player.js';
 import { createFuel, stepFuel, addFuel } from '../game/fuel.js';
-import { createCombo, comboCollect, comboMiss, comboMultiplier } from '../game/combo.js';
+import { createCombo, comboCollect, stepCombo, comboMultiplier } from '../game/combo.js';
 import { hitsAny, collectSugars } from '../game/collision.js';
 import { createStarfield } from './starfield.js';
 import { createExplosion } from './explosion.js';
@@ -83,7 +83,7 @@ export function createGameScene() {
     }
 
     // 2. the world keeps running either way — the wreck drifts through live traffic
-    const { missedSugars } = stepWorld(world);
+    stepWorld(world);
     starfield.update();
 
     if (dying) {
@@ -94,16 +94,16 @@ export function createGameScene() {
       return;
     }
 
-    // 3. a muffin that left the field uncollected breaks the combo
-    if (missedSugars > 0) comboMiss(combo);
-
-    // 4. muffins collected this frame: fuel, then the combo bonus
+    // 3. muffins collected this frame: fuel, then 100 x the multiplier they just raised
     const taken = collectSugars(player, world.sugars);
     for (let i = 0; i < taken; i++) {
       addFuel(fuel, FUEL.MUFFIN);
       score = Math.min(SCORE_MAX, score + comboCollect(combo));
       // The original has no pickup sound, and no sound may be added that it did not have.
     }
+
+    // 4. the combo burns down — after the pickups, so a muffin always buys a full cell
+    stepCombo(combo);
 
     // 5. the per-frame score, multiplied by the combo
     score = Math.min(SCORE_MAX, score + comboMultiplier(combo));
