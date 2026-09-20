@@ -403,6 +403,10 @@ test('the cache size is projected from the keyframes prepared so far', () => {
   assert.equal(projectedCacheBytes(base, 0, 0, 30), base, 'nothing measured yet');
   assert.equal(projectedCacheBytes(base, 300, 3, 30), base + 3000);
   assert.equal(projectedCacheBytes(base, 0, 30, 30), base, 'a loop that never changes costs the base');
+  // The canvas the shown keyframe is composed on is the same size as the base frame and is
+  // held for as long as the cache is, so it counts against the budget too.
+  assert.equal(projectedCacheBytes(base, 300, 3, 30, base), 2 * base + 3000);
+  assert.equal(projectedCacheBytes(base, 0, 0, 30, base), 2 * base);
   // The whole loop as full frames is what this replaces: 134 MB at scale 2 is over the
   // budget, 33.5 MB at scale 1 is not — and the patches have to bring 2 under it.
   const full = (scale) => 31 * Math.ceil(600 * scale) * Math.ceil(450 * scale) * 4;
@@ -434,6 +438,115 @@ test('the keyframes follow the manifest durations, 31 of them per 40 ticks', () 
   // Which is why the cache has to hold the whole loop: at 60 Hz the animation asks for a
   // different keyframe 46.5 times a second, and each one costs ~19 ms to rasterise.
   assert.equal((60 * frameCount) / loop, 46.5);
+});
+
+// --- the composed keyframe ---------------------------------------------------------------
+// The cache is a base frame plus patches, but the screen never sees the pieces: the shown
+// keyframe is composed onto one canvas in whole device pixels and blitted in a single
+// drawImage. Scaling the pieces separately is what leaves seams along the patch borders
+// when the window is bigger than the scale the cache was built at.
+
+/** A miniature title file of `count` frames, in the shape tools/make-title.py writes. */
+function toyFile(count) {
+  const line = (i) => `<g id="s${i}"><path d="M${i} ${i}"/></g>`;
+  const frame = (i) => `<!--frame:${i}--><g id="frame-${i}"${i === 0 ? '' : ' display="none"'}`
+    + ` transform="matrix(1,0,0,1,500,335)"><use xlink:href="#s${i}"/></g>`;
+  return ['<svg xmlns="http://www.w3.org/2000/svg" width="600" height="450" viewBox="200 110 600 450">',
+    '<defs>', ...Array.from({ length: count }, (_, i) => line(i)), '</defs>',
+    '<!--white backdrop intended by the artwork-->',
+    '<rect x="200" y="110" width="600" height="450" fill="#ffffff"/>',
+    ...Array.from({ length: count }, (_, i) => frame(i)),
+    '<!--frames:end-->', '</svg>', ''].join('\n');
+}
+
+/** Which frame a document built by `buildFrameParts` holds. */
+const frameOf = (pieces) => Number(/<g id="frame-(\d+)"/.exec(pieces.join(''))[1]);
+
+/** The pixels of keyframe `n`: one marked pixel, in a tile of its own per keyframe. */
+function pixelsOf(image, w, h) {
+  const data = new Uint8ClampedArray(w * h * 4);
+  const mark = ((image ? image.frame : 0) % 5) * 20;
+  data[mark * 4] = 255;
+  return data;
+}
+
+/** Canvases that record their size and what was last painted on them. No DOM. */
+function fakeCanvases() {
+  const made = [];
+  const create = (w, h) => {
+    const canvas = { width: w, height: h, painted: null, draws: 0 };
+    canvas.getContext = () => ({
+      canvas,
+      imageSmoothingEnabled: true,
+      setTransform() {},
+      clearRect() {},
+      drawImage(source) { canvas.draws += 1; canvas.painted = source; },
+      getImageData: (x, y, gw, gh) => ({ data: pixelsOf(canvas.painted, gw, gh) }),
+    });
+    made.push(canvas);
+    return canvas;
+  };
+  return { made, create };
+}
+
+/** A title cache over `count` toy keyframes, driven until the whole loop is prepared. */
+async function preparedTitle(count = 4) {
+  const canvases = fakeCanvases();
+  const title = createTitleFrames({
+    url: 'titleBg.svg',
+    size: [100, 60],
+    tile: 20,
+    loadText: () => Promise.resolve(toyFile(count)),
+    decodeFrame: (pieces) => Promise.resolve({ image: { frame: frameOf(pieces) }, release() {} }),
+    yieldToLoop: () => Promise.resolve(),
+    createCanvas: canvases.create,
+  });
+  const ctx = stubContext();
+  for (let i = 0; i < 200 && !title.stats().complete; i += 1) {
+    title.draw(ctx, 0, 1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  assert.equal(title.stats().complete, true, 'the toy loop never finished preparing');
+  return { title, canvases, ctx };
+}
+
+test('a keyframe is composed once and only when the shown keyframe changes', async () => {
+  const { title } = await preparedTitle();
+  const ctx = stubContext();
+  title.draw(ctx, 0, 1);
+  assert.equal(title.stats().composes, 1, 'the first keyframe is composed');
+  for (let i = 0; i < 5; i += 1) title.draw(ctx, 0, 1);
+  assert.equal(title.stats().composes, 1, 'standing still costs no composition at all');
+  title.draw(ctx, 1, 1);
+  assert.equal(title.stats().composes, 2);
+  title.draw(ctx, 2, 1);
+  title.draw(ctx, 2, 1);
+  assert.equal(title.stats().composes, 3);
+  title.draw(ctx, 0, 1);
+  assert.equal(title.stats().composes, 4, 'coming back to a keyframe composes it again');
+});
+
+test('the screen gets one blit of the composed canvas, whatever the scale', async () => {
+  const { title } = await preparedTitle();
+  for (const index of [0, 1, 2, 3]) {
+    const ctx = stubContext();
+    assert.equal(title.draw(ctx, index, 1), true);
+    assert.equal(ctx.calls.filter((c) => c === 'drawImage').length, 1,
+      `keyframe ${index} must reach the screen in one piece`);
+  }
+  // Above the cache's own scale the composed canvas is stretched — still once, as a whole,
+  // so no patch border is ever resampled on its own.
+  const ctx = stubContext();
+  title.draw(ctx, 1, 3);
+  assert.equal(ctx.calls.filter((c) => c === 'drawImage').length, 1);
+});
+
+test('the composed canvas is the size of the base frame and counts against the budget', async () => {
+  const { title } = await preparedTitle();
+  const stats = title.stats();
+  assert.equal(stats.baseBytes, 100 * 60 * 4);
+  assert.equal(stats.composedBytes, stats.baseBytes, 'one more frame-sized canvas');
+  assert.equal(stats.bytes, stats.baseBytes + stats.composedBytes + stats.patchBytes);
 });
 
 // --- when the artwork does not arrive ---------------------------------------------------

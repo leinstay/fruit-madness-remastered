@@ -27,9 +27,16 @@
 // that differ from it**: the field is cut into 12x9 tiles of 50 logical pixels, a keyframe
 // is rasterised once, its tiles are compared with the base's, and the ones that changed are
 // packed into a strip of a canvas — 14 MB for the loop at scale 1, 58 MB at scale 2, held
-// under a budget that drops the scale a step rather than overrun it. Drawing a keyframe is
-// then one blit of the base plus one blit per changed tile (0.2 ms), and the steady state
+// under a budget that drops the scale a step rather than overrun it. The steady state
 // rasterises nothing at all: 46.5 keyframes a second, none skipped, the page at 60 Hz.
+//
+// The pieces never reach the screen. When the shown keyframe changes, the base and that
+// keyframe's tiles are put together on one composed canvas at the cache's own scale, pixel
+// for pixel, and the screen gets that canvas in a single blit. Scaling the pieces
+// separately is only exact while the screen asks for the scale they were cached at: above
+// it — a window wider than 1200 px, where the cache is capped at 2 — every piece would be
+// resampled against its own edge and the borders would show as hairlines across the
+// artwork. One picture, stretched as a whole, cannot have a seam in it.
 //
 // Nothing here ever blocks the render loop. Keyframes are prepared one at a time, in
 // timeline order from the playhead, with a yield between the decode and the diff, so the
@@ -312,11 +319,13 @@ export function shownKeyframe(prepared, wanted) {
 
 /**
  * What the whole loop will cost once it is prepared, from the keyframes measured so far:
- * the base frame plus the average patch atlas over the `total` keyframes that need one.
+ * the base frame, the canvas the shown keyframe is composed on (`extraBytes`, the same size
+ * as the base) and the average patch atlas over the `total` keyframes that need one.
  */
-export function projectedCacheBytes(baseBytes, patchBytes, done, total) {
-  if (!(done > 0)) return baseBytes;
-  return baseBytes + Math.ceil((patchBytes / done) * total);
+export function projectedCacheBytes(baseBytes, patchBytes, done, total, extraBytes = 0) {
+  const fixed = baseBytes + extraBytes;
+  if (!(done > 0)) return fixed;
+  return fixed + Math.ceil((patchBytes / done) * total);
 }
 
 /** The scale the cache rasterises at for a given render scale: the display's, up to the cap. */
@@ -433,6 +442,7 @@ export function createTitleFrames({
   loadText = fetchDocumentText,
   decodeFrame = decodeDocument,
   yieldToLoop = yieldToPage,
+  createCanvas = makeCanvas,
 } = {}) {
   let status = 'idle';        // idle -> loading -> ready, or failed
   let parts = null;
@@ -451,6 +461,11 @@ export function createTitleFrames({
   let patches = [];           // per keyframe { canvas, list } — the tiles that differ
   let patchBytes = 0;
   let patchesDone = 0;
+  let composed = null;        // the whole keyframe on screen, assembled in device pixels
+  let composedCtx = null;
+  let composedBytes = 0;
+  let composedIndex = -1;     // which keyframe is standing on it
+  let composeCount = 0;
   let tileCounts = [];
   let prepared = [];
   let preparedCount = 0;
@@ -525,6 +540,10 @@ export function createTitleFrames({
     patches = [];
     patchBytes = 0;
     patchesDone = 0;
+    composed = null;
+    composedCtx = null;
+    composedBytes = 0;
+    composedIndex = -1;
     tileCounts = [];
     prepared = new Array(count()).fill(false);
     preparedCount = 0;
@@ -550,7 +569,7 @@ export function createTitleFrames({
 
   function ensureScratch(w, h) {
     if (scratch && scratch.width === w && scratch.height === h) return true;
-    scratch = makeCanvas(w, h);
+    scratch = createCanvas(w, h);
     scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
     return Boolean(scratchCtx);
   }
@@ -584,12 +603,19 @@ export function createTitleFrames({
     }
 
     if (!base) {
-      base = makeCanvas(w, h);
+      base = createCanvas(w, h);
       const c = base.getContext('2d');
       if (!c) throw new Error('no 2d context for the title base frame');
       c.drawImage(scratch, 0, 0);
       baseData = scratchCtx.getImageData(0, 0, w, h).data;
       baseBytes = w * h * 4;
+      // The surface the shown keyframe is assembled on, made with the base so that the
+      // budget knows about it from the first keyframe on.
+      composed = createCanvas(w, h);
+      composedCtx = composed.getContext('2d');
+      if (!composedCtx) throw new Error('no 2d context for the composed title frame');
+      composedBytes = w * h * 4;
+      composedIndex = -1;
       previous = null;
       tileCounts[index] = 0;
       patches[index] = null;
@@ -599,7 +625,7 @@ export function createTitleFrames({
       const atlas = packPatchAtlas(grid.rects, changed);
       let canvas = null;
       if (atlas.patches.length > 0) {
-        canvas = makeCanvas(atlas.width, atlas.height);
+        canvas = createCanvas(atlas.width, atlas.height);
         const c = canvas.getContext('2d');
         if (!c) throw new Error('no 2d context for a title patch');
         c.imageSmoothingEnabled = false;
@@ -617,7 +643,8 @@ export function createTitleFrames({
 
     // Re-checked as the loop goes: the first few keyframes already say what the rest will
     // cost, and dropping a step early is far cheaper than finding out at the last one.
-    const projected = projectedCacheBytes(baseBytes, patchBytes, patchesDone, Math.max(0, count() - 1));
+    const projected = projectedCacheBytes(baseBytes, patchBytes, patchesDone,
+      Math.max(0, count() - 1), composedBytes);
     if (projected > budgetBytes && nextTitleScale(scale) !== null) return 'overbudget';
     return 'done';
   }
@@ -649,30 +676,49 @@ export function createTitleFrames({
   }
 
   /**
-   * Blits one prepared keyframe: the base, then the tiles that keyframe changes.
+   * Puts one prepared keyframe together on the composed canvas: the base, then the tiles
+   * that keyframe changes, one cache pixel to one canvas pixel.
+   *
+   * This is the only place the pieces are ever handled, and it is exact — identity
+   * transform, whole-pixel rectangles, no resampling — so a patch border cannot differ
+   * from what a whole rasterisation of that keyframe would have produced. Done once per
+   * keyframe *change*, not once per animation frame: the animation asks for a different
+   * keyframe 46.5 times a second while the page repaints 60 times.
+   */
+  function compose(index) {
+    if (composedIndex === index) return true;
+    if (!composedCtx) return false;
+    composedCtx.setTransform(1, 0, 0, 1, 0, 0);
+    composedCtx.imageSmoothingEnabled = false;
+    composedCtx.drawImage(base, 0, 0);
+    const patch = patches[index];
+    if (patch) {
+      for (const p of patch.list) {
+        composedCtx.drawImage(patch.canvas, p.sx, p.sy, p.w, p.h, p.dx, p.dy, p.w, p.h);
+      }
+    }
+    composedIndex = index;
+    composeCount += 1;
+    return true;
+  }
+
+  /**
+   * Blits the composed keyframe: **one** `drawImage` of one canvas, whatever the scale.
    *
    * The cache holds whole device pixels, so it is blitted in device space: with the
-   * context's own scale undone, the base and every patch land on whole device pixels and,
-   * at the scale the cache was built for, they are copied one for one. Asking the context
-   * to place them in logical units instead costs a subpixel resample of the entire picture
-   * — which is invisible on the base alone but shows as a shimmer along the patch borders.
-   * Edges are taken as the difference of two rounded positions, never as a rounded width,
-   * so neighbouring patches cannot leave a gap when the cache is stretched.
+   * context's own scale undone, the picture lands on whole device pixels and, at the scale
+   * the cache was built for, it is copied one for one. Above that scale — a window larger
+   * than the cache's cap — the whole picture is stretched together. Stretching the base and
+   * every patch separately is what used to leave hairlines all over the artwork: each piece
+   * is resampled against its own edge, so the two sides of a patch border disagree.
    */
   function blit(ctx, index) {
-    const patch = patches[index];
+    if (!compose(index)) return;
     const view = readTransform(ctx);
     if (!view) {
       // A context that cannot report its transform (a very old canvas, a test stub): place
-      // everything in logical units and let it resample.
-      ctx.drawImage(base, 0, 0, size[0], size[1]);
-      if (patch) {
-        const kx = size[0] / grid.width;
-        const ky = size[1] / grid.height;
-        for (const p of patch.list) {
-          ctx.drawImage(patch.canvas, p.sx, p.sy, p.w, p.h, p.dx * kx, p.dy * ky, p.w * kx, p.h * ky);
-        }
-      }
+      // the picture in logical units and let it resample.
+      ctx.drawImage(composed, 0, 0, size[0], size[1]);
       return;
     }
     const k = view.scale / scale;          // device pixels per cache pixel
@@ -680,14 +726,7 @@ export function createTitleFrames({
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const x0 = at(view.x, 0);
     const y0 = at(view.y, 0);
-    ctx.drawImage(base, x0, y0, at(view.x, grid.width) - x0, at(view.y, grid.height) - y0);
-    if (!patch) return;
-    for (const p of patch.list) {
-      const px = at(view.x, p.dx);
-      const py = at(view.y, p.dy);
-      ctx.drawImage(patch.canvas, p.sx, p.sy, p.w, p.h,
-        px, py, at(view.x, p.dx + p.w) - px, at(view.y, p.dy + p.h) - py);
-    }
+    ctx.drawImage(composed, x0, y0, at(view.x, grid.width) - x0, at(view.y, grid.height) - y0);
   }
 
   function draw(ctx, index, renderScale) {
@@ -738,7 +777,9 @@ export function createTitleFrames({
       complete: count() > 0 && preparedCount === count(),
       baseBytes,
       patchBytes,
-      bytes: baseBytes + patchBytes,
+      composedBytes,
+      composes: composeCount,
+      bytes: baseBytes + patchBytes + composedBytes,
       tiles: [...tileCounts],
       tilesPerKeyframe: grid ? grid.rects.length : 0,
       decodeMs,
