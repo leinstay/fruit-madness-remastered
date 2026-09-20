@@ -130,7 +130,7 @@ export function createGameScene() {
     }
     if (explosion) explosion.render(c);
 
-    drawWarnings(c, assets, world.warnings, world.frame);
+    drawWarnings(c, world.warnings);
     drawHud(c, assets, { fuel, score, combo, frame: world.frame });
     drawButtons(c, assets);
     // The floating stick, only ever visible while a finger is actually holding it.

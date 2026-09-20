@@ -11,34 +11,38 @@ const laneX = (lane) => (lane + 0.5) * (W / LANES);
 // Diagonal modes: horizontal speed 4 + d, vertical 2/3 of it.
 const diag = (sx, sy) => (d) => [sx * (SPEED.d + d), sy * (2 / 3) * (SPEED.d + d)];
 
+// `danger` describes the attack the DANGER sign announces — the side or the corner the
+// fruit comes from — and nothing about how it is drawn. Where the sign goes on the field
+// and what it is made of belongs to the scene layer (js/scenes/captions.js).
+
 export const MODES = {
   1: { // from the right
     axis: 'h', lanePx: H / LANES,
-    danger: { sprite: 'dangerVt', x: W - 30, y: H / 2 },
+    danger: { kind: 'side', side: 'right' },
     vel: (d) => [-(SPEED.h + d), 0],
     spawn: (lane, s) => [W + s, laneY(lane)],
   },
   2: { // from the left
     axis: 'h', lanePx: H / LANES,
-    danger: { sprite: 'dangerVt', x: 30, y: H / 2 },
+    danger: { kind: 'side', side: 'left' },
     vel: (d) => [SPEED.h + d, 0],
     spawn: (lane, s) => [-s, laneY(lane)],
   },
   3: { // from the top
     axis: 'v', lanePx: W / LANES,
-    danger: { sprite: 'dangerHz', x: W / 2, y: 55 },
+    danger: { kind: 'side', side: 'top' },
     vel: (d) => [0, SPEED.v + d],
     spawn: (lane, s) => [laneX(lane), -s],
   },
   4: { // from the bottom
     axis: 'v', lanePx: W / LANES,
-    danger: { sprite: 'dangerHz', x: W / 2, y: H - 40 },
+    danger: { kind: 'side', side: 'bottom' },
     vel: (d) => [0, -(SPEED.v + d)],
     spawn: (lane, s) => [laneX(lane), H + s],
   },
   5: { // from the top-left, heading down-right
     axis: 'd', lanePx: H / LANES,
-    danger: { sprite: 'dangerDiag', x: 100, y: 100 },
+    danger: { kind: 'corner', corner: 'tl' },
     vel: diag(1, 1),
     spawn: (lane, s) => [
       [0.75 * W, 0.25 * W, -s, -s, -s][lane],
@@ -47,7 +51,7 @@ export const MODES = {
   },
   6: { // from the bottom-right, heading up-left
     axis: 'd', lanePx: H / LANES,
-    danger: { sprite: 'dangerDiag', x: W - 100, y: H - 100 },
+    danger: { kind: 'corner', corner: 'br' },
     vel: diag(-1, -1),
     spawn: (lane, s) => [
       [0.25 * W, 0.75 * W, W + s, W + s, W + s][lane],
@@ -56,7 +60,7 @@ export const MODES = {
   },
   7: { // from the top-right, heading down-left
     axis: 'd', lanePx: H / LANES,
-    danger: { sprite: 'dangerDiag', x: W - 100, y: 100 },
+    danger: { kind: 'corner', corner: 'tr' },
     vel: diag(-1, 1),
     spawn: (lane, s) => [
       [0.25 * W, 0.75 * W, W + s, W + s, W + s][lane],
@@ -65,7 +69,7 @@ export const MODES = {
   },
   8: { // from the bottom-left, heading up-right
     axis: 'd', lanePx: H / LANES,
-    danger: { sprite: 'dangerDiag', x: 100, y: H - 100 },
+    danger: { kind: 'corner', corner: 'bl' },
     vel: diag(1, -1),
     spawn: (lane, s) => [
       [0.75 * W, 0.25 * W, -s, -s, -s][lane],

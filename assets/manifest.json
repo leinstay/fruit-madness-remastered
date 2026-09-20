@@ -83,62 +83,6 @@
         28
       ]
     },
-    "dangerHz": {
-      "frames": [
-        "assets/sprites/dangerHz_0.svg",
-        "assets/sprites/dangerHz_1.svg",
-        "assets/sprites/dangerHz_2.svg",
-        "assets/sprites/dangerHz_3.svg",
-        "assets/sprites/dangerHz_4.svg",
-        "assets/sprites/dangerHz_5.svg",
-        "assets/sprites/dangerHz_6.svg",
-        "assets/sprites/dangerHz_7.svg"
-      ],
-      "textOnly": true,
-      "fps": 30,
-      "anchor": [
-        144.45,
-        14
-      ],
-      "size": [
-        288.9,
-        31.75
-      ]
-    },
-    "dangerVt": {
-      "frames": [
-        "assets/sprites/dangerVt_0.svg",
-        "assets/sprites/dangerVt_1.svg",
-        "assets/sprites/dangerVt_2.svg",
-        "assets/sprites/dangerVt_3.svg",
-        "assets/sprites/dangerVt_4.svg",
-        "assets/sprites/dangerVt_5.svg",
-        "assets/sprites/dangerVt_6.svg",
-        "assets/sprites/dangerVt_7.svg"
-      ],
-      "textOnly": true,
-      "fps": 30,
-      "anchor": [
-        12,
-        156.35
-      ],
-      "size": [
-        28.5,
-        307
-      ]
-    },
-    "dangerDiag": {
-      "file": "assets/sprites/dangerDiag.svg",
-      "notext": "assets/sprites/dangerDiag.notext.svg",
-      "anchor": [
-        29.35,
-        29.35
-      ],
-      "size": [
-        58.7,
-        60.5
-      ]
-    },
     "star": {
       "file": "assets/sprites/star.svg",
       "anchor": [

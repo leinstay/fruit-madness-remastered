@@ -7,9 +7,7 @@ import { deviceScale, snapToDevice } from '../core/canvas.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
 import { comboDrain, drainSplitY } from '../game/combo.js';
-import {
-  drawButtonCaption, drawCapsuleCaption, drawDangerStrip, drawDangerMark, dangerAlpha,
-} from './captions.js';
+import { drawButtonCaption, drawCapsuleCaption, drawDangerSign, dangerAlpha } from './captions.js';
 import { expandRect, MIN_TOUCH_SIZE } from './ui.js';
 
 // Positions of the original HUD (GameLoop.as); all three capsules sit on the same row.
@@ -18,11 +16,6 @@ export const SCORE_BAR = { x: 300, y: 32 };
 export const COMBO_BAR = { x: 543, y: 32 };
 export const BTN_PAUSE = { x: 57, y: 425 };
 export const BTN_MENU = { x: 546, y: 425 };
-
-const BLINK_TICKS = 15;                 // 2 Hz at 60 fps: 15 on, 15 off
-
-/** True on the "lit" half of a 2 Hz blink. */
-export const blinkOn = (frame) => Math.floor(frame / BLINK_TICKS) % 2 === 0;
 
 /**
  * The on-screen rectangle a sprite would occupy when drawn at (x, y). The size comes from
@@ -78,12 +71,13 @@ function drawFuel(ctx, assets, fuelValue) {
   }
 }
 
-// The digits belong on the inner centre of the capsule ring, not of the whole sprite:
-// scoreBar.png is 103x48 and carries the small "adventure score" caption on rows 3-9.
-// Measured from the PNG: the white ring spans rows 14..46 and its opening rows 17..43, so
-// the inner centre lies on the middle of row 30 — half a pixel below the manifest anchor
-// [51.5, 30]. comboBar.png is the very same capsule (identical rows), while fuelBar.png is
-// one row shorter (ring 14..45, opening 16..43) and centres on the anchor itself.
+// The digits belong on the inner centre of the capsule ring, not of the whole sprite: the
+// score capsule is 103x48 and carries the small "adventure score" caption on rows 3-9.
+// Measured from the 2013 render: the white ring spans rows 14..46 and its opening rows
+// 17..43, so the inner centre lies on the middle of row 30 — half a pixel below the
+// manifest anchor [51.5, 30]. The combo capsule is the very same shape (identical rows),
+// while the fuel one is a row shorter (ring 14..45, opening 16..43) and centres on the
+// anchor itself.
 const SCORE_TEXT_DY = 0.5;
 
 function drawScore(ctx, assets, score) {
@@ -188,20 +182,13 @@ export function drawButtons(ctx, assets) {
 }
 
 /**
- * The DANGER signs announcing the next attack side, blinking at 2 Hz. The two strips are
- * their lettering and nothing else, and their own flash is the alpha ramp of the original
- * timeline; the diagonal sign is a red ring with an exclamation mark inside it.
+ * The DANGER signs announcing where the next attack comes from: a straight strip along a
+ * side, an L wrapped around a corner, all of it lettering and nothing else. Each one fades
+ * in and out on its own age, so a sign that has just gone up is always fully lit.
  */
-export function drawWarnings(ctx, assets, warnings, frame) {
-  if (!warnings || warnings.length === 0 || !blinkOn(frame)) return;
-  for (const wn of warnings) {
-    if (wn.sprite === 'dangerDiag') {
-      drawSprite(ctx, assets, wn.sprite, 0, wn.x, wn.y);
-      drawDangerMark(ctx, wn.x, wn.y);
-      continue;
-    }
-    drawDangerStrip(ctx, wn.sprite, assets.size(wn.sprite), assets.anchor(wn.sprite), wn.x, wn.y, dangerAlpha(frame));
-  }
+export function drawWarnings(ctx, warnings) {
+  if (!warnings || warnings.length === 0) return;
+  for (const wn of warnings) drawDangerSign(ctx, wn, dangerAlpha(wn.age));
 }
 
 export function drawPaused(ctx) {

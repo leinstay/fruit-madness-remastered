@@ -78,7 +78,9 @@ function toWarning(d) {
   d.timer = 0;
   d.streams = [];
   d.nextPlan = chooseNextPlan(d);
-  d.warnings = d.nextPlan.modes.map((m) => ({ ...MODES[m].danger }));
+  // One warning per stream: the descriptor of the attack it announces, plus how many
+  // frames the sign has been up, which is what the scene fades it with.
+  d.warnings = d.nextPlan.modes.map((m) => ({ ...MODES[m].danger, age: 0 }));
 }
 
 function toAttack(d) {
@@ -116,7 +118,12 @@ export function stepDirector(d) {
   d.timer += 1;
 
   if (d.phase === 'warning') {
-    if (d.timer >= DIRECTOR.WARNING_FRAMES) toAttack(d);
+    if (d.timer >= DIRECTOR.WARNING_FRAMES) {
+      toAttack(d);
+      return out;
+    }
+    // The sign is as old as the phase, so every warning starts fully lit on its own frame 0.
+    for (const warning of d.warnings) warning.age = d.timer;
     return out; // nothing spawns while the DANGER sign is up
   }
 

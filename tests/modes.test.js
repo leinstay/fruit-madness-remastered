@@ -16,6 +16,35 @@ test('mode 5: diagonal down-right with 2/3 slope', () => {
   const e = spawnEnemy(5, 2, 0); assert.equal(e.vx, 4); assert.ok(Math.abs(e.vy - 8 / 3) < 1e-9);
   assert.ok(e.x < 0 && e.y < 0);
 });
+test('every mode names the side or corner its attack comes from, and nothing else', () => {
+  assert.deepEqual(MODES[1].danger, { kind: 'side', side: 'right' });
+  assert.deepEqual(MODES[2].danger, { kind: 'side', side: 'left' });
+  assert.deepEqual(MODES[3].danger, { kind: 'side', side: 'top' });
+  assert.deepEqual(MODES[4].danger, { kind: 'side', side: 'bottom' });
+  assert.deepEqual(MODES[5].danger, { kind: 'corner', corner: 'tl' });
+  assert.deepEqual(MODES[6].danger, { kind: 'corner', corner: 'br' });
+  assert.deepEqual(MODES[7].danger, { kind: 'corner', corner: 'tr' });
+  assert.deepEqual(MODES[8].danger, { kind: 'corner', corner: 'bl' });
+  // The warning is a description of the attack, never a position or a drawing: where the
+  // sign goes is the scene's business.
+  for (const [id, mode] of Object.entries(MODES)) {
+    assert.deepEqual(Object.keys(mode.danger).sort(), mode.danger.kind === 'side'
+      ? ['kind', 'side'] : ['corner', 'kind'], `mode ${id} carries presentation data`);
+  }
+});
+
+test('the danger descriptor of a mode agrees with the direction it attacks from', () => {
+  const SIDE = { right: [-1, 0], left: [1, 0], top: [0, 1], bottom: [0, -1] };
+  const CORNER = { tl: [1, 1], tr: [-1, 1], bl: [1, -1], br: [-1, -1] };
+  for (const [id, mode] of Object.entries(MODES)) {
+    const [vx, vy] = mode.vel(0);
+    const want = mode.danger.kind === 'side' ? SIDE[mode.danger.side] : CORNER[mode.danger.corner];
+    assert.ok(want, `mode ${id}: unknown descriptor`);
+    assert.equal(Math.sign(vx), want[0], `mode ${id}: vx`);
+    assert.equal(Math.sign(vy), want[1], `mode ${id}: vy`);
+  }
+});
+
 test('every mode eventually crosses the field and leaves', () => {
   for (const id of Object.keys(MODES)) for (let lane = 0; lane < 5; lane++) {
     const e = spawnEnemy(+id, lane, 0); let entered = false;

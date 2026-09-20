@@ -67,9 +67,13 @@ test('every animated sprite has timing for exactly its frames', () => {
 test('every sprite the game logic can name is in the manifest', () => {
   // The one fruit the director hands to every attack wave.
   assert.ok(FRUIT in sprites, `director can emit '${FRUIT}'`);
-  // The DANGER sign each of the eight attack modes announces itself with.
+  // The DANGER signs are runtime text: a mode describes the side or the corner its attack
+  // comes from and never names a drawing, so the manifest holds no sign art at all.
   for (const [id, mode] of Object.entries(MODES)) {
-    assert.ok(mode.danger.sprite in sprites, `mode ${id} warns with '${mode.danger.sprite}'`);
+    assert.ok(!('sprite' in mode.danger), `mode ${id} must not name a sprite`);
+  }
+  for (const name of Object.keys(sprites)) {
+    assert.ok(!/danger/i.test(name), `sprites.${name}: the DANGER signs are text, not art`);
   }
   // And the pieces the combo bar is assembled from: the score capsule, because the 2013
   // combo symbol has its muffins and its "not working yet :(" line baked in, plus the

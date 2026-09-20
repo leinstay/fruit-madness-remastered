@@ -25,6 +25,36 @@ test('15s attack -> 5s warning without spawns -> new mode, difficulty +0.05', ()
   assert.equal(d.phase, 'attack'); assert.equal(d.shift, 1);
   assert.ok(Math.abs(d.difficulty - 0.25) < 1e-9);
 });
+test('a warning carries the descriptor of the attack it announces and its own age', () => {
+  const d = createDirector(createRng(5));
+  for (let f = 0; f < 900; f++) stepDirector(d);
+  assert.equal(d.phase, 'warning');
+  assert.ok(d.warnings.length >= 1);
+  for (const w of d.warnings) {
+    assert.ok(w.kind === 'side' || w.kind === 'corner', 'a warning names a side or a corner');
+    assert.equal(w.age, 0, 'a warning starts at age 0, so the fade starts lit');
+  }
+  for (let f = 1; f <= 299; f++) {
+    stepDirector(d);
+    assert.ok(d.warnings.every((w) => w.age === f), `age at frame ${f}`);
+  }
+  stepDirector(d);
+  assert.equal(d.phase, 'attack');
+  assert.deepEqual(d.warnings, [], 'the signs go with the warning phase');
+});
+
+test('a double side warns twice, one descriptor per stream', () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    const d = createDirector(createRng(seed));
+    for (let f = 0; f < 1200 * 10; f++) {
+      stepDirector(d);
+      if (d.phase === 'warning' && d.nextPlan) {
+        assert.equal(d.warnings.length, d.nextPlan.modes.length, `seed ${seed}, shift ${d.shift}`);
+      }
+    }
+  }
+});
+
 test('single plans never repeat the previous mode; doubles are perpendicular; no doubles before shift 4', () => {
   for (let seed = 1; seed <= 30; seed++) {
     const d = createDirector(createRng(seed)); let prev = d.plan;
