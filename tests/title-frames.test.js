@@ -149,7 +149,7 @@ test('a file that is not in that shape is rejected rather than half-read', () =>
 test('the shipped title file slices into 31 usable frames', () => {
   const parts = sliceTitleFrames(fs.readFileSync(FILE, 'utf8'));
   assert.equal(parts.frames.length, 31);
-  assert.equal(parts.definitions.size, 295);
+  assert.equal(parts.definitions.size, 287);
   for (let n = 0; n < parts.frames.length; n += 1) {
     assert.ok(parts.frames[n].startsWith(`<g id="frame-${n}"`), `frame ${n}`);
     assert.ok(!parts.frames[n].includes('display="none"'), `frame ${n} is visible`);

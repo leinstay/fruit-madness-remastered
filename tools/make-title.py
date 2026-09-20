@@ -37,13 +37,18 @@ The one raster in the whole artwork is the rainbow "madness" banner, 135x60 px. 
 lives in the repository as assets/sprites/titleBanner.png and is embedded as a data
 URI, rendered with `image-rendering: pixelated` as it always was.
 
+One layer of the artwork is held still: the fizz inside the cola bottle (see
+FROZEN_LAYERS). It is a 95x126 px detail that redraws nine times over the loop and
+costs more than half of everything that moves, so it is stored once instead. Run
+with --no-freeze to build the fully animated file.
+
 Options
 -------
-  --freeze PART   hold every layer whose name contains PART on its first keyframe.
-                  Repeatable, matched case-insensitively. The heaviest animation in
-                  the title by far is the fizz inside the cola bottle; freezing it
-                  roughly halves the file at the cost of that one movement. Off by
-                  default: the title keeps every animation it had in 2013.
+  --freeze-index N  hold the layer at index N of the symbol's layer list on its
+                  first keyframe. Repeatable. Overrides FROZEN_LAYERS.
+  --freeze PART   the same by name: hold every layer whose name contains PART.
+                  Repeatable, matched case-insensitively. Overrides FROZEN_LAYERS.
+  --no-freeze     hold nothing; the title keeps every animation it had in 2013.
   --out FILE      write somewhere other than assets/sprites/titleBg.svg.
 
 Deterministic and idempotent: the same document always produces a byte-identical
@@ -77,8 +82,17 @@ ORIGIN = (500, 335)
 
 EXPECTED_FRAMES = 31
 
+# Layers of `ITEM` that are held on their first keyframe, by index in the symbol's
+# layer list. The one entry is the fill of the cola bottle, i.e. the bubbles rising
+# in it: a 95x126 px detail with nine drawings of its own, which is 61 % of
+# everything that moves over the loop. Frozen on purpose — the menu is calmer for
+# it and the file drops from 982 KB to 408 KB on the wire. Recorded here rather
+# than passed on the command line so that a plain run reproduces the file that is
+# committed. Indices are stable: they are the order the layers are stored in.
+FROZEN_LAYERS = (164,)
 
-def build(fla, freeze=()):
+
+def build(fla, freeze=(), freeze_indices=FROZEN_LAYERS):
     """-> (svg text, stats dict)."""
     data = xfl.open_document(fla)
     timeline = xfl.load_symbol(data, ITEM, fla)
@@ -94,8 +108,11 @@ def build(fla, freeze=()):
     # definition, which is most of why the file is a tenth of the frame-by-frame
     # size.
     drawings = {}                       # layer index -> {tick: markup}
+    held_layers = []
     for index, layer in layers:
-        held = frozen(layer, freeze)
+        held = frozen(index, layer, freeze, freeze_indices)
+        if held is not None:
+            held_layers.append((index, len(xfl.keyframes_of(layer))))
         per_tick = {}
         for tick, _duration in xfl.keyframes_of(layer):
             frame = xfl.frame_for(layer, held if held is not None else tick)
@@ -160,6 +177,7 @@ def build(fla, freeze=()):
         "frames": len(ticks),
         "definitions": len(ordered),
         "defs_bytes": len(body.encode("utf-8")),
+        "held": held_layers,
         "notes": sorted(converter.notes),
     }
     return text, stats
@@ -174,10 +192,10 @@ def banner():
     return (xfl.data_uri(BANNER_FILE), float(width), float(height))
 
 
-def frozen(layer, freeze):
+def frozen(index, layer, freeze, freeze_indices):
     """The tick a frozen layer is held on, or None when it animates normally."""
     name = (layer.get("name") or "").lower()
-    if not any(part in name for part in freeze):
+    if index not in freeze_indices and not any(part in name for part in freeze):
         return None
     keys = xfl.keyframes_of(layer)
     return keys[0][0] if keys else None
@@ -202,19 +220,37 @@ def main(argv=None):
     parser.add_argument("--freeze", action="append", default=[], metavar="PART",
                         help="hold every layer whose name contains PART on its "
                              "first keyframe")
+    parser.add_argument("--freeze-index", action="append", default=[], type=int,
+                        metavar="N", help="hold the layer at index N on its first "
+                                          "keyframe")
+    parser.add_argument("--no-freeze", action="store_true",
+                        help="hold nothing; keep every animation")
     parser.add_argument("--out", default=OUT_FILE)
     args = parser.parse_args(argv)
 
-    text, stats = build(args.fla, tuple(part.lower() for part in args.freeze))
+    chosen = args.freeze or args.freeze_index
+    indices = () if args.no_freeze else (tuple(args.freeze_index) if chosen
+                                         else FROZEN_LAYERS)
+    names = () if args.no_freeze else tuple(part.lower() for part in args.freeze)
+    text, stats = build(args.fla, names, indices)
     if stats["frames"] != EXPECTED_FRAMES:
         raise SystemExit("the title has %d keyframes, expected %d"
                          % (stats["frames"], EXPECTED_FRAMES))
+    # A layer that is held but only ever had one drawing would mean the selection
+    # has drifted off the layer it was written for.
+    for index in indices:
+        if (index, 1) in stats["held"]:
+            raise SystemExit("layer %d draws only once; it is not the animated "
+                             "layer this build expects" % index)
+        if not any(index == held for held, _count in stats["held"]):
+            raise SystemExit("layer %d is not a drawn layer of the title" % index)
     raw = text.encode("utf-8")
     with open(args.out, "w", encoding="utf-8", newline="") as fh:
         fh.write(text)
 
-    print("%s: %d frames of %d layers, %d unique drawings"
-          % (args.out, stats["frames"], stats["layers"], stats["definitions"]))
+    print("%s: %d frames of %d layers, %d unique drawings, %d held still"
+          % (args.out, stats["frames"], stats["layers"], stats["definitions"],
+             len(stats["held"])))
     print("bytes: %d raw, %d gzipped (definitions %d)"
           % (len(raw), len(gzip.compress(raw, 9)), stats["defs_bytes"]))
     for note in stats["notes"]:
