@@ -4,8 +4,6 @@
 
 **[▶ Play now](https://leinstay.github.io/fruit-madness-remastered/)** — no install, no plugins, runs in any modern browser.
 
-![Fruit Madness Remastered gameplay](assets/readme/gameplay.webp)
-
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![No dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
 
 ## About
