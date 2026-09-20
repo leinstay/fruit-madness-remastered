@@ -5,8 +5,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { W, H } from '../js/config.js';
 import {
-  dangerAlpha, dangerStackGlyphs, dangerBarBox, dangerCornerGlyphs,
+  dangerAlpha, dangerStackGlyphs, dangerBarBox, dangerCornerArms, dangerBoxes,
   DANGER_TEXT, DANGER_CORNER_TEXT, DANGER_SIZE, DANGER_FADE_PERIOD, DANGER_LAYOUT,
+  DANGER_MAX_ADVANCE,
 } from '../js/scenes/captions.js';
 
 // The two bands a sign must stay out of: the HUD capsules along the top and the two
@@ -133,102 +134,145 @@ test('every glyph of a straight strip is inside the field and out of both bands'
 // --- the four corner signs --------------------------------------------------------------
 
 const CORNERS = ['tl', 'tr', 'bl', 'br'];
+const SIDES = ['left', 'right', 'top', 'bottom'];
+const cornerSign = (c) => ({ kind: 'corner', corner: c });
+const sideSign = (s) => ({ kind: 'side', side: s });
 
-test('a corner sign reads DANGER through its corner, eight glyphs an arm', () => {
+/** Do two boxes share any area? Touching edges do not count as an overlap. */
+const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** The shortest distance between two boxes; 0 when they touch, negative when they meet. */
+function gap(a, b) {
+  const dx = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
+  const dy = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+  if (dx >= 0 && dy >= 0) return Math.hypot(dx, dy);
+  return Math.max(dx, dy);
+}
+
+test('a corner sign reads DANGER through its corner, one arm stacked and one a line', () => {
   for (const c of CORNERS) {
-    const glyphs = dangerCornerGlyphs(c);
-    assert.equal(glyphs.length, 16, `${c}: two arms of eight`);
-    assert.equal(glyphs.map((g) => g.ch).join(''), DANGER_CORNER_TEXT, `${c}: reading order`);
+    const sign = dangerCornerArms(c);
+    assert.equal(sign.arms.length, 2, `${c}: two arms`);
+    assert.equal(sign.arms.map((a) => a.text).join(''), DANGER_CORNER_TEXT, `${c}: reading order`);
+    assert.equal(sign.arms[0].text, '**** DAN');
+    assert.equal(sign.arms[1].text, 'GER ****');
+    // One arm is typeset like a left/right strip, the other like a top/bottom one.
+    assert.deepEqual(sign.arms.map((a) => a.kind).sort(), ['line', 'stack'], `${c}: one of each`);
   }
 });
 
-test('at a left corner the DAN arm is vertical, at a right corner it is horizontal', () => {
-  const corner = DANGER_LAYOUT.corner;
+test('at a left corner the DAN arm is the stacked one, at a right corner the line', () => {
   for (const c of CORNERS) {
-    const glyphs = dangerCornerGlyphs(c);
-    const into = glyphs.slice(0, 8);      // '**** DAN', reading into the corner
-    const outOf = glyphs.slice(8);        // 'GER ****', leaving the corner
+    const sign = dangerCornerArms(c);
     const left = c === 'tl' || c === 'bl';
-    const vertical = (arm) => arm.every((g) => g.x === corner[c].x);
-    const horizontal = (arm) => arm.every((g) => g.y === corner[c].y);
-    assert.ok(left ? vertical(into) : horizontal(into), `${c}: the DAN arm`);
-    assert.ok(left ? horizontal(outOf) : vertical(outOf), `${c}: the GER arm`);
-    // The N ends the first arm right next to the corner, the G starts the other one there.
-    const pitch = DANGER_LAYOUT.armPitch;
-    const dist = (g) => Math.abs(g.x - corner[c].x) + Math.abs(g.y - corner[c].y);
-    assert.equal(into[7].ch, 'N');
-    assert.equal(dist(into[7]), pitch, `${c}: the N sits one cell from the corner`);
-    assert.equal(outOf[0].ch, 'G');
-    assert.equal(dist(outOf[0]), pitch, `${c}: the G sits one cell from the corner`);
+    assert.equal(sign.arms[0].kind, left ? 'stack' : 'line', `${c}: the DAN arm`);
+    assert.equal(sign.arms[1].kind, left ? 'line' : 'stack', `${c}: the GER arm`);
+    // A horizontal arm always reads left to right: it starts at the corner of a left sign
+    // and ends at the corner of a right one.
+    const line = sign.arms.find((a) => a.kind === 'line');
+    assert.equal(line.align, left ? 'left' : 'right', `${c}: reading direction`);
+    assert.equal(line.y, DANGER_LAYOUT.corner[c].y, `${c}: the line runs along the corner's row`);
+    assert.equal(Math.abs(line.x - DANGER_LAYOUT.corner[c].x), DANGER_LAYOUT.cornerInset, `${c}: line inset`);
   }
 });
 
-test('horizontal arms always read left to right, vertical ones towards the corner', () => {
-  // tl: the vertical arm reads upwards into the corner, the horizontal one leaves it right.
-  const tl = dangerCornerGlyphs('tl');
-  assert.deepEqual(tl[7], { ch: 'N', x: 45, y: 100 });
-  assert.deepEqual(tl[8], { ch: 'G', x: 60, y: 85 });
-  assert.ok(tl[0].y > tl[7].y, 'tl: the marks hang below the word');
-  assert.ok(tl[15].x > tl[8].x, 'tl: the second arm runs to the right');
-  // bl: the vertical arm reads downwards into the corner.
-  const bl = dangerCornerGlyphs('bl');
-  assert.deepEqual(bl[7], { ch: 'N', x: 45, y: 350 });
-  assert.deepEqual(bl[8], { ch: 'G', x: 60, y: 365 });
-  assert.ok(bl[0].y < bl[7].y, 'bl: the marks sit above the word');
-  assert.ok(bl[15].x > bl[8].x, 'bl: the second arm runs to the right');
-  // tr: the horizontal arm ends at the corner, the vertical one leaves it downwards.
-  const tr = dangerCornerGlyphs('tr');
-  assert.deepEqual(tr[7], { ch: 'N', x: 540, y: 85 });
-  assert.deepEqual(tr[8], { ch: 'G', x: 555, y: 100 });
-  assert.ok(tr[0].x < tr[7].x, 'tr: the first arm reads left to right');
-  assert.ok(tr[15].y > tr[8].y, 'tr: the second arm runs downwards');
-  // br: the horizontal arm ends at the corner, the vertical one leaves it upwards.
-  const br = dangerCornerGlyphs('br');
-  assert.deepEqual(br[7], { ch: 'N', x: 540, y: 365 });
-  assert.deepEqual(br[8], { ch: 'G', x: 555, y: 350 });
-  assert.ok(br[0].x < br[7].x, 'br: the first arm reads left to right');
-  assert.ok(br[15].y < br[8].y, 'br: the second arm runs upwards');
-});
-
-test('both arms of a corner sign share one pitch and leave the corner cell empty', () => {
-  const corner = DANGER_LAYOUT.corner;
-  const pitch = DANGER_LAYOUT.armPitch;
-  assert.ok(pitch >= 14 && pitch <= 16, `the arm pitch is ${pitch}`);
+test('the stacked arm of a corner sign is spaced exactly like a side strip', () => {
+  const { letterPitch, markPitch, cornerGap, cornerInset } = DANGER_LAYOUT;
+  assert.ok(cornerGap >= markPitch, 'the word is set off by at least one mark pitch');
   for (const c of CORNERS) {
-    const glyphs = dangerCornerGlyphs(c);
-    const step = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-    for (let i = 1; i < 8; i++) assert.equal(step(glyphs[i - 1], glyphs[i]), pitch, `${c}: DAN arm cell ${i}`);
-    for (let i = 9; i < 16; i++) assert.equal(step(glyphs[i - 1], glyphs[i]), pitch, `${c}: GER arm cell ${i}`);
-    // Nothing sits on the corner itself, and no two glyphs share a cell.
-    const seen = new Set();
-    for (const g of glyphs) {
-      const key = `${g.x},${g.y}`;
-      assert.ok(!seen.has(key), `${c}: two glyphs on ${key}`);
-      seen.add(key);
-      assert.ok(g.x !== corner[c].x || g.y !== corner[c].y, `${c}: a glyph on the corner cell`);
-    }
-    // An arm is 90-110 px of lettering, corner cell aside.
-    const span = 7 * pitch;
-    assert.ok(span >= 90 && span <= 110, `${c}: arm span ${span}`);
+    const stack = dangerCornerArms(c).arms.find((a) => a.kind === 'stack');
+    assert.equal(stack.glyphs.length, 7, `${c}: three letters and four marks`);
+    assert.ok(stack.glyphs.every((g) => g.x === DANGER_LAYOUT.corner[c].x), `${c}: one column`);
+    // In reading order a stack may run either way, so measure along the arm instead.
+    const d = stack.glyphs.map((g) => Math.abs(g.y - DANGER_LAYOUT.corner[c].y)).sort((a, b) => a - b);
+    const steps = d.slice(1).map((v, i) => v - d[i]);
+    assert.equal(d[0], cornerInset, `${c}: the first glyph sits one letter pitch from the corner`);
+    assert.deepEqual(steps, [letterPitch, letterPitch, cornerGap, markPitch, markPitch, markPitch],
+      `${c}: letters ${letterPitch} apart and marks ${markPitch}, exactly as on a side strip`);
+    assert.ok(letterPitch >= 19 && markPitch >= 14, 'and those are the strip pitches');
   }
+});
+
+test('the stacked arm ends at the corner with the N, the line leaves it with the G', () => {
+  const nearest = (glyphs, point) => glyphs.reduce((a, b) => (
+    Math.hypot(a.x - point.x, a.y - point.y) <= Math.hypot(b.x - point.x, b.y - point.y) ? a : b));
+  for (const c of CORNERS) {
+    const sign = dangerCornerArms(c);
+    const point = DANGER_LAYOUT.corner[c];
+    const stack = sign.arms.find((a) => a.kind === 'stack');
+    const stacksDan = sign.arms[0].kind === 'stack';
+    assert.equal(nearest(stack.glyphs, point).ch, stacksDan ? 'N' : 'G', `${c}: the glyph next to the corner`);
+    assert.equal(stack.glyphs.map((g) => g.ch).join(''), stacksDan ? '****DAN' : 'GER****', `${c}: reading order`);
+  }
+  // The stacked arm of a left sign reads towards the corner, of a right sign away from it.
+  const glyphsOf = (c) => dangerCornerArms(c).arms.find((a) => a.kind === 'stack').glyphs;
+  assert.ok(glyphsOf('tl')[0].y > glyphsOf('tl')[6].y, 'tl: the marks hang below the word');
+  assert.ok(glyphsOf('bl')[0].y < glyphsOf('bl')[6].y, 'bl: the marks sit above the word');
+  assert.ok(glyphsOf('tr')[0].y < glyphsOf('tr')[6].y, 'tr: GER leaves the corner downwards');
+  assert.ok(glyphsOf('br')[0].y > glyphsOf('br')[6].y, 'br: GER leaves the corner upwards');
+});
+
+test('the two arms of a corner sign never overlap, and the corner cell stays empty', () => {
+  // Inside one stacked column the spacing is the strip's own (19 px letters, 14 px marks,
+  // checked above): the marks are set closer than the cap box is tall because their ink is
+  // a small cross, which is exactly how the 2013 strip is set. What must not touch is one
+  // arm against the other, and that is measured on the generous boxes.
+  for (const c of CORNERS) {
+    const sign = dangerCornerArms(c);
+    // dangerBoxes lists the first arm's boxes and then the second's: seven for a stacked
+    // arm, one for a line.
+    const boxes = dangerBoxes(cornerSign(c));
+    const split = sign.arms[0].kind === 'stack' ? 7 : 1;
+    assert.equal(boxes.length, 8, `${c}: seven stacked glyphs and one line`);
+    for (const a of boxes.slice(0, split)) {
+      for (const b of boxes.slice(split)) assert.ok(!overlaps(a, b), `${c}: the arms run into each other`);
+    }
+  }
+  for (const c of CORNERS) {
+    const point = DANGER_LAYOUT.corner[c];
+    for (const b of dangerBoxes(cornerSign(c))) {
+      const inside = point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h;
+      assert.ok(!inside, `${c}: a glyph covers the corner itself`);
+    }
+  }
+});
+
+test('a corner sign never touches a straight strip', () => {
+  let smallest = Infinity;
+  for (const c of CORNERS) {
+    for (const s of SIDES) {
+      for (const a of dangerBoxes(cornerSign(c))) {
+        for (const b of dangerBoxes(sideSign(s))) {
+          assert.ok(!overlaps(a, b), `${c} runs into the ${s} strip`);
+          smallest = Math.min(smallest, gap(a, b));
+        }
+      }
+    }
+  }
+  assert.ok(smallest > 0, `the closest a corner sign comes to a strip is ${smallest}`);
+});
+
+test('every box of every sign is inside the field and out of both bands', () => {
+  for (const sign of [...CORNERS.map(cornerSign), ...SIDES.map(sideSign)]) {
+    for (const b of dangerBoxes(sign)) {
+      assert.ok(b.x >= 0 && b.x + b.w <= W, `${JSON.stringify(sign)}: x ${b.x}..${b.x + b.w}`);
+      assert.ok(b.y > HUD_BOTTOM, `${JSON.stringify(sign)}: y ${b.y} under the HUD`);
+      assert.ok(b.y + b.h < BUTTONS_TOP, `${JSON.stringify(sign)}: y ${b.y + b.h} on the buttons`);
+    }
+  }
+});
+
+test('a glyph box is the widest advance of the face on its cap height', () => {
+  assert.equal(DANGER_MAX_ADVANCE, DANGER_SIZE * 0.625);
+  for (const b of dangerBoxes(cornerSign('tl'))) assert.equal(b.h, CAP);
 });
 
 test('the four corner signs are each other mirror images', () => {
-  const cells = (c) => dangerCornerGlyphs(c).map((g) => `${g.x},${g.y}`).sort();
-  const mirrorX = (c) => dangerCornerGlyphs(c).map((g) => `${W - g.x},${g.y}`).sort();
-  const mirrorY = (c) => dangerCornerGlyphs(c).map((g) => `${g.x},${H - g.y}`).sort();
-  assert.deepEqual(mirrorX('tl'), cells('tr'));
-  assert.deepEqual(mirrorX('bl'), cells('br'));
-  assert.deepEqual(mirrorY('tl'), cells('bl'));
-  assert.deepEqual(mirrorY('tr'), cells('br'));
-});
-
-test('every glyph of a corner sign is inside the field and out of both bands', () => {
-  for (const c of CORNERS) {
-    for (const g of dangerCornerGlyphs(c)) {
-      assert.ok(g.x - CAP / 2 > 0 && g.x + CAP / 2 < W, `${c}: x ${g.x}`);
-      assert.ok(g.y - CAP / 2 > HUD_BOTTOM, `${c}: y ${g.y} under the HUD`);
-      assert.ok(g.y + CAP / 2 < BUTTONS_TOP, `${c}: y ${g.y} on the buttons`);
-    }
-  }
+  const boxes = (c) => dangerBoxes(cornerSign(c)).map((b) => `${b.x},${b.y},${b.w},${b.h}`).sort();
+  const mirrorX = (c) => dangerBoxes(cornerSign(c)).map((b) => `${W - b.x - b.w},${b.y},${b.w},${b.h}`).sort();
+  const mirrorY = (c) => dangerBoxes(cornerSign(c)).map((b) => `${b.x},${H - b.y - b.h},${b.w},${b.h}`).sort();
+  assert.deepEqual(mirrorX('tl'), boxes('tr'));
+  assert.deepEqual(mirrorX('bl'), boxes('br'));
+  assert.deepEqual(mirrorY('tl'), boxes('bl'));
+  assert.deepEqual(mirrorY('tr'), boxes('br'));
 });

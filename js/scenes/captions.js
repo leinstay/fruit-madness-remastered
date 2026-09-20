@@ -108,10 +108,10 @@ export const DANGER_LAYOUT = {
     bottom: { x: 300, y: 390 },
   },
   corner: {
-    tl: { x: 45, y: 85 },
-    tr: { x: 555, y: 85 },
-    bl: { x: 45, y: 365 },
-    br: { x: 555, y: 365 },
+    tl: { x: 45, y: 90 },
+    tr: { x: 555, y: 90 },
+    bl: { x: 45, y: 360 },
+    br: { x: 555, y: 360 },
   },
   // The stacked strips, measured from the 2013 render: one character a line, the marks
   // 14 px apart and the six letters 19 px, with the word set off from the marks. The
@@ -125,10 +125,22 @@ export const DANGER_LAYOUT = {
   barWidth: 288.90,
   barHeight: 31.75,
   barScaleX: 1.0401,
-  // The corner signs are new, so nothing is stretched and both arms share one pitch —
-  // the only way an L of proportional glyphs reads as even on both arms.
-  armPitch: 15,
+  // A corner sign is typeset exactly like the straight strips, only shorter: its stacked
+  // arm uses the same letter and mark pitches, its line arm the font's own advances (and
+  // no stretch — these signs are new). `cornerGap` is the strip's set-off between the word
+  // and the marks, scaled down for the shorter arm but never below one mark pitch;
+  // `cornerInset` is the empty corner: one letter pitch before the first glyph of each arm,
+  // so the two arms cannot touch.
+  cornerInset: 19,
+  cornerGap: 19,
 };
+
+/**
+ * The widest advance this face has at this size (0.625 em; the marks and most letters are
+ * that or narrower). Used only to bound what a sign can cover — for clearances and for the
+ * tests — never to place a glyph: horizontal layout stays the font's job.
+ */
+export const DANGER_MAX_ADVANCE = DANGER_SIZE * 0.625;
 
 const STACK_TEXT = 'DANGER';
 const STACK_MARKS = 5;
@@ -161,34 +173,104 @@ export function dangerBarBox(side) {
 }
 
 /**
- * The L-shaped sign of a corner attack, in reading order: `**** DAN` on the arm that runs
- * into the corner and `GER ****` on the arm that leaves it, so the word reads through the
- * corner itself. At a left corner the word arrives along the vertical arm and leaves along
- * the horizontal one; at a right corner it is the other way round, because a horizontal arm
- * always reads left to right. The corner cell stays empty, so the arms never collide.
+ * How far from the corner each glyph of a stacked arm sits, walking outwards: the strip's
+ * own pitches, `letterPitch` between letters, `markPitch` between marks and `cornerGap`
+ * across the space that sets the word off from them.
  */
-export function dangerCornerGlyphs(corner) {
+function stackedArm(outward) {
+  const { letterPitch, markPitch, cornerInset, cornerGap } = DANGER_LAYOUT;
+  const cells = [];
+  let d = cornerInset;
+  let prev = null;
+  let afterGap = false;
+  for (const ch of outward) {
+    if (ch === ' ') { afterGap = true; continue; }
+    if (prev !== null) {
+      if (afterGap) d += cornerGap;
+      else d += (ch === '*' && prev === '*') ? markPitch : letterPitch;
+    }
+    cells.push({ ch, d });
+    prev = ch;
+    afterGap = false;
+  }
+  return cells;
+}
+
+/**
+ * The L-shaped sign of a corner attack: `**** DAN` on the arm that runs into the corner and
+ * `GER ****` on the arm that leaves it, in that order, so the word reads **through** the
+ * corner. At a left corner the word arrives along the vertical arm and leaves along the
+ * horizontal one; at a right corner it is the other way round, because a horizontal arm
+ * always reads left to right.
+ *
+ * The two arms are typeset as their straight strips are: a `stack` arm is glyph-per-line on
+ * the strip pitches, a `line` arm is one string the font lays out itself. Each starts one
+ * `cornerInset` from the corner point, so the corner stays empty and the arms never meet.
+ */
+export function dangerCornerArms(corner) {
   const at = DANGER_LAYOUT.corner[corner];
-  if (!at) return [];
-  const pitch = DANGER_LAYOUT.armPitch;
-  const arm = DANGER_CORNER_TEXT.length / 2;            // eight cells an arm
+  if (!at) return null;
+  const half = DANGER_CORNER_TEXT.length / 2;
   const left = corner === 'tl' || corner === 'bl';
   const top = corner === 'tl' || corner === 'tr';
   const awayX = left ? 1 : -1;                          // towards the middle of the side
   const awayY = top ? 1 : -1;
-  const cell = (vertical, distance) => (vertical
-    ? { x: at.x, y: at.y + awayY * distance }
-    : { x: at.x + awayX * distance, y: at.y });
-  const out = [];
-  // The arm reading into the corner: its last glyph, the N, is the cell next to it.
-  for (let i = 0; i < arm; i++) {
-    out.push({ ch: DANGER_CORNER_TEXT[i], ...cell(left, (arm - i) * pitch) });
+
+  const arm = (text, intoCorner) => {
+    // The stacked arm is the vertical one: into the corner at a left sign, out of it at a
+    // right sign, which is what keeps every horizontal arm reading left to right.
+    const stacked = intoCorner === left;
+    if (!stacked) {
+      return {
+        kind: 'line', text, y: at.y,
+        x: at.x + awayX * DANGER_LAYOUT.cornerInset,
+        align: awayX > 0 ? 'left' : 'right',
+      };
+    }
+    const outward = intoCorner ? [...text].reverse().join('') : text;
+    const glyphs = stackedArm(outward).map(({ ch, d }) => ({ ch, x: at.x, y: at.y + awayY * d }));
+    // Listed in reading order: an arm that runs into the corner is read from its far end.
+    return { kind: 'stack', text, glyphs: intoCorner ? glyphs.reverse() : glyphs };
+  };
+
+  return {
+    point: { x: at.x, y: at.y },
+    arms: [arm(DANGER_CORNER_TEXT.slice(0, half), true), arm(DANGER_CORNER_TEXT.slice(half), false)],
+  };
+}
+
+/** The box one glyph can cover, centred on its cell. */
+const glyphBox = (g) => ({
+  x: g.x - DANGER_MAX_ADVANCE / 2, y: g.y - CAP / 2, w: DANGER_MAX_ADVANCE, h: CAP,
+});
+
+/** The box a drawn line can cover: the font sets it no wider than this. */
+function lineBox(arm) {
+  const w = arm.text.length * DANGER_MAX_ADVANCE;
+  return { x: arm.align === 'right' ? arm.x - w : arm.x, y: arm.y - CAP / 2, w, h: CAP };
+}
+
+/**
+ * Everything a sign can cover, as boxes on the field. Deliberately generous — a drawn
+ * string is measured as if every glyph were the widest one — so a clearance that holds
+ * here holds on screen.
+ */
+export function dangerBoxes(warning) {
+  if (!warning) return [];
+  if (warning.kind === 'corner') {
+    const sign = dangerCornerArms(warning.corner);
+    if (!sign) return [];
+    return sign.arms.flatMap((a) => (a.kind === 'stack' ? a.glyphs.map(glyphBox) : [lineBox(a)]));
   }
-  // And the arm leaving it, starting one cell out on the other side of the corner.
-  for (let i = 0; i < arm; i++) {
-    out.push({ ch: DANGER_CORNER_TEXT[arm + i], ...cell(!left, (i + 1) * pitch) });
+  if (warning.side === 'left' || warning.side === 'right') {
+    return dangerStackGlyphs(warning.side).map(glyphBox);
   }
-  return out;
+  const at = DANGER_LAYOUT.side[warning.side];
+  const box = dangerBarBox(warning.side);
+  if (!at || !box) return [];
+  // The lettering is wider than the sign and is clipped to it, so the sign's own box is
+  // the bound; vertically it is the cap band the strip is centred on.
+  return [{ x: box.x, y: at.y - CAP / 2, w: box.w, h: CAP }];
 }
 
 /** One glyph of a sign, centred on its cell: the ink, not the advance box. */
@@ -196,6 +278,18 @@ function drawDangerGlyph(ctx, ch, x, y) {
   if (ch === ' ') return;
   drawText(ctx, ch, x + DANGER_SIZE * INK_CENTRE_SHIFT, baselineFor(y), {
     size: DANGER_SIZE, align: 'center', color: DANGER_COLOR,
+  });
+}
+
+/**
+ * One line of a corner sign, laid out by the font itself. A right-aligned line is nudged
+ * by the trailing 1/8 em of spacing every glyph of this face carries, so that its ink, not
+ * its advance box, ends on the anchor.
+ */
+function drawDangerLine(ctx, arm) {
+  const dx = arm.align === 'right' ? DANGER_SIZE * INK_CENTRE_SHIFT * 2 : 0;
+  drawText(ctx, arm.text, arm.x + dx, baselineFor(arm.y), {
+    size: DANGER_SIZE, align: arm.align, color: DANGER_COLOR,
   });
 }
 
@@ -225,7 +319,11 @@ export function drawDangerSign(ctx, warning, alpha = 1) {
   ctx.save();
   ctx.globalAlpha = Math.min(1, alpha);
   if (warning.kind === 'corner') {
-    for (const g of dangerCornerGlyphs(warning.corner)) drawDangerGlyph(ctx, g.ch, g.x, g.y);
+    const sign = dangerCornerArms(warning.corner);
+    for (const arm of sign ? sign.arms : []) {
+      if (arm.kind === 'stack') for (const g of arm.glyphs) drawDangerGlyph(ctx, g.ch, g.x, g.y);
+      else drawDangerLine(ctx, arm);
+    }
   } else if (warning.side === 'left' || warning.side === 'right') {
     for (const g of dangerStackGlyphs(warning.side)) drawDangerGlyph(ctx, g.ch, g.x, g.y);
   } else {
