@@ -114,7 +114,8 @@ js/
   services/         the Firestore leaderboard client
 assets/             sprites, font, music and sound effects
 tests/              node --test suites, including the survivability simulator
-tools/              the scripts that build the sprites and prepare the vector ones
+tools/              the scripts that build the sprites, including xfl2svg.py, which
+                    converts drawings from the original 2013 Flash source document to SVG
 firestore.rules     the leaderboard security rules
 ```
 

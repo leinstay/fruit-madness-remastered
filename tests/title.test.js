@@ -99,6 +99,14 @@ test('the title screen is one SVG covering the visible field', () => {
   assertBalanced(svg, 'titleBg.svg');
 });
 
+test('the file holds the whole animation and stays small enough to ship', () => {
+  assert.equal([...svg.matchAll(/<!--frame:\d+-->/g)].length, FRAMES, 'frame count');
+  // One request carries the whole title. The wire cost is a fifth of this (the host
+  // gzips SVG), but the parsed document still has to fit on a phone.
+  const bytes = fs.statSync(FILE).size;
+  assert.ok(bytes < 5 * 1024 * 1024, `titleBg.svg is ${bytes} bytes`);
+});
+
 test('the frame markers are exactly one per frame and in order', () => {
   const markers = [...svg.matchAll(/<!--frame:(\d+)-->/g)].map((m) => Number(m[1]));
   assert.deepEqual(markers, Array.from({ length: FRAMES }, (_, n) => n));
