@@ -62,7 +62,10 @@ function chooseNextPlan(d) {
   const nextShift = d.shift + 1;
   const current = d.plan.modes;
 
-  const doubleChance = Math.min(DIRECTOR.DOUBLE_MAX_CHANCE, 0.1 * (nextShift - (DIRECTOR.DOUBLE_FROM_SHIFT - 1)));
+  const doubleChance = Math.min(
+    DIRECTOR.DOUBLE_MAX_CHANCE,
+    DIRECTOR.DOUBLE_CHANCE_STEP * (nextShift - (DIRECTOR.DOUBLE_FROM_SHIFT - 1)),
+  );
   if (nextShift >= DIRECTOR.DOUBLE_FROM_SHIFT && rng.chance(doubleChance)) {
     const sameAsNow = (p) => p.length === current.length && p.every((m) => current.includes(m));
     const pairs = PERPENDICULAR_PAIRS.filter((p) => !sameAsNow(p));

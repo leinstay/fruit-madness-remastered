@@ -1,7 +1,7 @@
 // tests/director.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ENEMY } from '../js/config.js';
+import { DIRECTOR, ENEMY } from '../js/config.js';
 import { createRng } from '../js/core/rng.js';
 import { createDirector, stepDirector, waveInterval } from '../js/game/director.js';
 
@@ -55,7 +55,7 @@ test('a double side warns twice, one descriptor per stream', () => {
   }
 });
 
-test('single plans never repeat the previous mode; doubles are perpendicular; no doubles before shift 4', () => {
+test('single plans never repeat the previous mode; doubles are perpendicular; none before the third attack', () => {
   for (let seed = 1; seed <= 30; seed++) {
     const d = createDirector(createRng(seed)); let prev = d.plan;
     for (let f = 0; f < 1200 * 15; f++) {
@@ -63,12 +63,39 @@ test('single plans never repeat the previous mode; doubles are perpendicular; no
       if (d.plan !== prev) {
         if (d.plan.type === 'single' && prev.modes) assert.ok(!prev.modes.includes(d.plan.modes[0]));
         if (d.plan.type === 'double') {
-          assert.ok(d.shift >= 4);
+          assert.ok(d.shift >= DIRECTOR.DOUBLE_FROM_SHIFT, `seed ${seed}: a double at shift ${d.shift}`);
           const [a, b] = d.plan.modes; assert.ok(a <= 2 && b >= 3 && b <= 4);
         }
         prev = d.plan;
       }
     }
+  }
+});
+
+// The plan of attack N (1-based) is the plan the director holds at shift N-1.
+function planTypes(seed, attacks) {
+  const d = createDirector(createRng(seed));
+  const types = [d.plan.type];
+  for (let f = 0; d.shift < attacks - 1; f++) { stepDirector(d); if (d.shift === types.length) types.push(d.plan.type); }
+  return types;
+}
+
+test('doubles start on the third attack: ~40% there, ~80% from the fourth on, never over the cap', () => {
+  const SEEDS = 2000, ATTACKS = 6;
+  const doubles = new Array(ATTACKS).fill(0);
+  for (let seed = 1; seed <= SEEDS; seed++) {
+    const types = planTypes(seed, ATTACKS);
+    types.forEach((t, i) => { if (t === 'double') doubles[i] += 1; });
+  }
+  const rate = (i) => doubles[i] / SEEDS;
+  assert.equal(doubles[0], 0, 'no double on the first attack');
+  assert.equal(doubles[1], 0, 'no double on the second attack');
+  assert.ok(Math.abs(rate(2) - 0.4) <= 0.06, `third attack double rate ${rate(2)}`);
+  for (let i = 3; i < ATTACKS; i++) {
+    assert.ok(Math.abs(rate(i) - 0.8) <= 0.06, `attack ${i + 1} double rate ${rate(i)}`);
+  }
+  for (let i = 0; i < ATTACKS; i++) {
+    assert.ok(rate(i) <= DIRECTOR.DOUBLE_MAX_CHANCE + 0.06, `attack ${i + 1} exceeds the cap: ${rate(i)}`);
   }
 });
 test('every plan is a plain attack with the original cherry', () => {
