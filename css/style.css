@@ -71,6 +71,11 @@ canvas {
 
 #nick-form[hidden] { display: none; }
 
+/* The field and the button share their top, height, border, font size and line box, so the
+   two boxes line up and their text sits on one baseline.
+   iOS zooms the page in whenever a focused field's text is smaller than 16 CSS pixels, and
+   on a phone 4.4cqh of the canvas is far less than that — hence the floor, applied to both
+   so the shared baseline survives it. */
 #nick-form input,
 #nick-form button {
   position: absolute;
@@ -80,32 +85,52 @@ canvas {
   box-sizing: border-box;
   pointer-events: auto;
   font-family: 'PixelFont', monospace;
-  font-size: 4.4cqh;
+  font-size: max(16px, 4.4cqh);
   line-height: 1;
+  /* PixelFont is not centred in its own line box. Measured from assets/fonts/pixel.ttf
+     (unitsPerEm 1024): ascender 683, descender 256, and every digit and capital spans
+     0..640, so the cap box is 0.625em tall. With line-height 1 that cap box ends up
+     0.625 - (683 - 256) / 1024 = 0.208em higher than the middle of the box. Half of that
+     is how far the line must drop, and a padding-top of the full 0.208em does exactly
+     that, because the line is centred in the content box. In em, so it scales with the
+     font size rather than being a fixed nudge. */
+  padding-block: 0.208em 0;
+  padding-inline: 1.5%;
   color: #fff;
   background: #090011;
   border: 0.45cqh solid #fff;
   border-radius: 0;
-  padding: 0 1.5%;
   outline: none;
   -webkit-appearance: none;
   appearance: none;
 }
 
-/* iOS zooms the page in whenever a focused field's text is smaller than 16 CSS pixels, and
-   on a phone 4.4cqh of the canvas is far less than that — hence the floor. The field also
-   keeps its own text selectable, unlike the rest of the stage. */
+/* The field keeps its own text selectable, unlike the rest of the stage. */
 #nick-form input {
   left: 21%;
   width: 40%;
-  font-size: max(16px, 4.4cqh);
   user-select: text;
   -webkit-user-select: text;
 }
-#nick-form button { left: 63.5%; width: 16%; text-align: center; cursor: pointer; padding: 0; }
+#nick-form button {
+  left: 63.5%;
+  width: 16%;
+  padding-inline: 0;
+  display: inline-flex;      /* centres SUBMIT in the box for real, instead of per-UA rules */
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+}
 #nick-form button:hover:enabled { color: #ffe14d; border-color: #ffe14d; }
 #nick-form input:disabled, #nick-form button:disabled { opacity: 0.45; cursor: default; }
-#nick-form input::placeholder { color: #776b88; }
+/* The placeholder must sit exactly where the typed text will: same face, same size, same line. */
+#nick-form input::placeholder {
+  color: #776b88;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
 
 #nick-form #nick-error {
   position: absolute;

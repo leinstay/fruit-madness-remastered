@@ -59,11 +59,19 @@ function drawFuel(ctx, assets, fuelValue) {
   }
 }
 
+// The digits belong on the inner centre of the capsule ring, not of the whole sprite:
+// scoreBar.png is 103x48 and carries the small "adventure score" caption on rows 3-9.
+// Measured from the PNG: the white ring spans rows 14..46 and its opening rows 17..43, so
+// the inner centre lies on the middle of row 30 — half a pixel below the manifest anchor
+// [51.5, 30]. comboBar.png is the very same capsule (identical rows), while fuelBar.png is
+// one row shorter (ring 14..45, opening 16..43) and centres on the anchor itself.
+const SCORE_TEXT_DY = 0.5;
+
 function drawScore(ctx, assets, score) {
   drawSprite(ctx, assets, 'scoreBar', 0, SCORE_BAR.x, SCORE_BAR.y);
   const shown = Math.min(SCORE_MAX, Math.max(0, Math.floor(score)));
-  drawText(ctx, String(shown).padStart(7, '0'), SCORE_BAR.x, SCORE_BAR.y + 12, {
-    size: 16, align: 'center', color: '#fff',
+  drawText(ctx, String(shown).padStart(7, '0'), SCORE_BAR.x, SCORE_BAR.y + SCORE_TEXT_DY, {
+    size: 16, align: 'center', color: '#fff', valign: 'center',
   });
 }
 

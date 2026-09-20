@@ -66,7 +66,7 @@ browsers refuse to load over `file://`.
 ### Tests
 
 ```bash
-node --test tests/          # 132 tests, about 90 seconds
+node --test tests/          # 142 tests, about 90 seconds
 ```
 
 The long survivability proof is opt-in, because it is slow:
