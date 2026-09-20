@@ -3,7 +3,6 @@
 // The data comes from js/services/leaderboard.js (Cloud Firestore); a failed fetch simply
 // leaves the table in its OFFLINE state and never interrupts the game.
 import { W, H } from '../config.js';
-import { drawSprite } from '../core/assets.js';
 import { drawText } from '../core/text.js';
 import { fetchTop10 } from '../services/leaderboard.js';
 import { createStarfield } from './starfield.js';
@@ -62,9 +61,10 @@ export function createLeaderboardScene() {
   }
 
   function render(c) {
+    // The 2013 Background symbol is a flat fill of this very colour, so it is painted, not
+    // blitted.
     c.fillStyle = app.bgColor;
     c.fillRect(0, 0, W, H);
-    drawSprite(c, app.assets, 'background', 0, 0, 0);
     starfield.render(c, app.assets);
 
     drawText(c, 'TOP 10', W / 2, TITLE_Y, { size: 36, align: 'center' });

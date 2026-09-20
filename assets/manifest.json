@@ -319,6 +319,7 @@
         "assets/sprites/dangerHz_6.svg",
         "assets/sprites/dangerHz_7.svg"
       ],
+      "textOnly": true,
       "fps": 30,
       "anchor": [
         144.45,
@@ -340,6 +341,7 @@
         "assets/sprites/dangerVt_6.svg",
         "assets/sprites/dangerVt_7.svg"
       ],
+      "textOnly": true,
       "fps": 30,
       "anchor": [
         12,
@@ -422,6 +424,7 @@
     },
     "btnStart": {
       "file": "assets/sprites/btnStart.svg",
+      "textOnly": true,
       "anchor": [
         63.7,
         22.25
@@ -433,6 +436,7 @@
     },
     "btnPause": {
       "file": "assets/sprites/btnPause.svg",
+      "textOnly": true,
       "anchor": [
         50.5,
         16.55
@@ -444,6 +448,7 @@
     },
     "btnMenu": {
       "file": "assets/sprites/btnMenu.svg",
+      "textOnly": true,
       "anchor": [
         42.55,
         16.55

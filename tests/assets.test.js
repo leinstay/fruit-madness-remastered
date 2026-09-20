@@ -1,25 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSpriteEntry } from '../js/core/assets.js';
+import { normalizeSpriteEntry, spriteSource, rasterFrameSize, isCacheable } from '../js/core/assets.js';
 
 test('string form: a single frame, no timing, centre anchor', () => {
   assert.deepEqual(normalizeSpriteEntry('assets/sprites/star.png'),
-    { frames: ['assets/sprites/star.png'], timing: null, anchor: null, size: null, notext: null });
+    { frames: ['assets/sprites/star.png'], timing: null, anchor: null, size: null, notext: null, textOnly: false });
 });
 
 test('{file, anchor} form: a single frame with an explicit registration point', () => {
   assert.deepEqual(normalizeSpriteEntry({ file: 'assets/sprites/fuelBar.png', anchor: [51.5, 30] }),
-    { frames: ['assets/sprites/fuelBar.png'], timing: null, anchor: [51.5, 30], size: null, notext: null });
+    { frames: ['assets/sprites/fuelBar.png'], timing: null, anchor: [51.5, 30], size: null, notext: null, textOnly: false });
 });
 
 test('{frames, fps} form: uniform timing', () => {
   assert.deepEqual(normalizeSpriteEntry({ frames: ['a.png', 'b.png'], fps: 12 }),
-    { frames: ['a.png', 'b.png'], timing: 12, anchor: null, size: null, notext: null });
+    { frames: ['a.png', 'b.png'], timing: 12, anchor: null, size: null, notext: null, textOnly: false });
 });
 
 test('{frames, durations, anchor} form: per-frame ticks plus an anchor', () => {
   assert.deepEqual(normalizeSpriteEntry({ frames: ['c0.png', 'c1.png'], durations: [8, 14], anchor: [23, 23] }),
-    { frames: ['c0.png', 'c1.png'], timing: [8, 14], anchor: [23, 23], size: null, notext: null });
+    { frames: ['c0.png', 'c1.png'], timing: [8, 14], anchor: [23, 23], size: null, notext: null, textOnly: false });
 });
 
 test('a durations array of the wrong length is rejected', () => {
@@ -40,12 +40,80 @@ test('a vector entry keeps its logical viewport and its text-free variant', () =
       anchor: [51.5, 30],
       size: [103, 46.5],
       notext: 'assets/sprites/fuelBar.notext.svg',
+      textOnly: false,
     });
 });
 
 test('an animated vector entry carries the size alongside its timing', () => {
   assert.deepEqual(normalizeSpriteEntry({ frames: ['u0.svg', 'u1.svg'], fps: 12, anchor: [35.5, 34.5], size: [71.1, 69.1] }),
-    { frames: ['u0.svg', 'u1.svg'], timing: 12, anchor: [35.5, 34.5], size: [71.1, 69.1], notext: null });
+    { frames: ['u0.svg', 'u1.svg'], timing: 12, anchor: [35.5, 34.5], size: [71.1, 69.1], notext: null, textOnly: false });
+});
+
+test('a symbol that is nothing but its caption says so', () => {
+  assert.equal(normalizeSpriteEntry({ file: 'btnStart.svg', anchor: [63.7, 22.25], size: [128.6, 50.75], textOnly: true }).textOnly, true);
+  assert.equal(normalizeSpriteEntry({ file: 'btnStart.svg', textOnly: 'yes' }).textOnly, false);
+});
+
+// --- which files a sprite is really drawn from ---------------------------------------
+const raster = (...frames) => normalizeSpriteEntry({ frames, fps: 12, anchor: [1, 2] });
+
+test('a sprite with no vector of its own keeps its raster frames', () => {
+  const spec = raster('a.png', 'b.png');
+  assert.deepEqual(spriteSource(spec, null), { kind: 'raster', frames: ['a.png', 'b.png'], timing: 12, anchor: [1, 2], size: null });
+});
+
+test('a sprite whose vector carries no text is drawn from the vector', () => {
+  const spec = raster('cherry_0.png', 'cherry_1.png');
+  const vector = normalizeSpriteEntry({ frames: ['cherry_0.svg', 'cherry_1.svg'], fps: 12, anchor: [23, 23], size: [48, 48] });
+  assert.deepEqual(spriteSource(spec, vector),
+    { kind: 'vector', frames: ['cherry_0.svg', 'cherry_1.svg'], timing: 12, anchor: [23, 23], size: [48, 48] });
+});
+
+test('art with a baked-in caption stays raster until the captions are drawn at runtime', () => {
+  const spec = normalizeSpriteEntry({ file: 'scoreBar.png', anchor: [51.5, 30] });
+  const withCaption = normalizeSpriteEntry({ file: 'scoreBar.svg', notext: 'scoreBar.notext.svg', anchor: [51.45, 30], size: [103, 47.2] });
+  const allCaption = normalizeSpriteEntry({ file: 'btnStart.svg', anchor: [63.7, 22.25], size: [128.6, 50.75], textOnly: true });
+  assert.equal(spriteSource(spec, withCaption).kind, 'raster');
+  assert.equal(spriteSource(spec, allCaption).kind, 'raster');
+  assert.deepEqual(spriteSource(spec, withCaption).frames, ['scoreBar.png']);
+});
+
+test('a vector entry without a usable size is not trusted', () => {
+  const spec = raster('star.png');
+  assert.equal(spriteSource(spec, normalizeSpriteEntry({ file: 'star.svg', anchor: [2.5, 2.5] })).kind, 'raster');
+  assert.equal(spriteSource(spec, normalizeSpriteEntry({ file: 'star.svg', anchor: [0, 0], size: [0, 5] })).kind, 'raster');
+});
+
+test('the raster cache rounds a frame up to whole device pixels', () => {
+  assert.deepEqual(rasterFrameSize([71.1, 69.1], 1), [72, 70]);
+  assert.deepEqual(rasterFrameSize([71.1, 69.1], 2), [143, 139]);
+  assert.deepEqual(rasterFrameSize([48, 48], 3), [144, 144]);
+  assert.deepEqual(rasterFrameSize([5, 5], 0), [5, 5]);
+  assert.deepEqual(rasterFrameSize([0.2, 0.2], 1), [1, 1]);
+});
+
+test('only the symbols small enough to be worth it are cached', () => {
+  assert.equal(isCacheable([71.1, 69.1]), true);
+  assert.equal(isCacheable([288.9, 31.75]), true);
+  assert.equal(isCacheable([600, 450]), false);     // the full-stage Game Over frame
+  assert.equal(isCacheable(null), false);
+});
+
+test('the cache of every vector frame stays a few megabytes', async () => {
+  const manifest = await readManifest();
+  const bytesAt = (scale) => {
+    let total = 0;
+    for (const entry of Object.values(manifest.vectors)) {
+      const v = normalizeSpriteEntry(entry);
+      if (!isCacheable(v.size)) continue;
+      const [w, h] = rasterFrameSize(v.size, scale);
+      total += w * h * 4 * v.frames.length;
+    }
+    return total;
+  };
+  // Single-digit megabytes even with every vector cached at the maximum render scale.
+  assert.ok(bytesAt(1) < 1024 * 1024 * 2, `scale 1 cache ${bytesAt(1)} bytes`);
+  assert.ok(bytesAt(3) < 1024 * 1024 * 10, `scale 3 cache ${bytesAt(3)} bytes`);
 });
 
 const readManifest = async () => {

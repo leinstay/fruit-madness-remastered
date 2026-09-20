@@ -80,6 +80,9 @@ function applyCanvasSize() {
   }
   renderScale = size.scale;
   app.renderScale = size.scale;
+  // The vector art is cached as bitmaps of whole device pixels, so a new scale means a new
+  // cache. Asking for the scale it already holds costs nothing.
+  if (app.assets && app.assets.rasterise) app.assets.rasterise(size.scale);
 }
 
 // `(resolution: Xdppx)` only matches the ratio it was created with, so the query has to be
@@ -122,6 +125,7 @@ function watchCanvasSize() {
 async function boot() {
   watchCanvasSize();
   app.assets = await loadAssets('assets/manifest.json');
+  app.assets.rasterise(renderScale);
   await ensurePixelFont(20);
   ctx.imageSmoothingEnabled = false;
 

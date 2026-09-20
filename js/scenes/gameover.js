@@ -122,9 +122,10 @@ export function createGameOverScene() {
 
   function render(c) {
     const assets = app.assets;
+    // The 2013 Background symbol is a flat fill of this very colour, so it is painted, not
+    // blitted.
     c.fillStyle = app.bgColor;
     c.fillRect(0, 0, W, H);
-    drawSprite(c, assets, 'background', 0, 0, 0);
     starfield.render(c, assets);
     drawWorldSprites(c, assets, world);
     if (explosion) explosion.render(c);

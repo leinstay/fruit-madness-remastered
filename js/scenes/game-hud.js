@@ -3,6 +3,7 @@
 // Kept out of game.js so that scene stays about the game loop.
 import { W, H, FUEL, COMBO, SCORE_MAX } from '../config.js';
 import { drawSprite } from '../core/assets.js';
+import { deviceScale, snapToDevice } from '../core/canvas.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
 import { comboDrain, drainSplitY } from '../game/combo.js';
@@ -20,13 +21,16 @@ const BLINK_TICKS = 15;                 // 2 Hz at 60 fps: 15 on, 15 off
 /** True on the "lit" half of a 2 Hz blink. */
 export const blinkOn = (frame) => Math.floor(frame / BLINK_TICKS) % 2 === 0;
 
-/** The on-screen rectangle a sprite would occupy when drawn at (x, y). */
+/**
+ * The on-screen rectangle a sprite would occupy when drawn at (x, y). The size comes from
+ * `assets.size`, never from the image: a vector frame is cached at the device resolution
+ * and its `<img>` reports a rounded viewport, neither of which is the logical size.
+ */
 export function spriteRect(assets, name, x, y) {
-  if (!assets || !assets.has(name)) return { x, y, w: 0, h: 0 };
-  const img = assets.img(name, 0);
-  if (!img || !img.width) return { x, y, w: 0, h: 0 };
-  const a = assets.anchor(name) || [img.width / 2, img.height / 2];
-  return { x: x - a[0], y: y - a[1], w: img.width, h: img.height };
+  const wh = assets && assets.size ? assets.size(name) : null;
+  if (!wh) return { x, y, w: 0, h: 0 };
+  const a = assets.anchor(name) || [wh[0] / 2, wh[1] / 2];
+  return { x: x - a[0], y: y - a[1], w: wh[0], h: wh[1] };
 }
 
 export const rectHit = (r, p) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
@@ -40,18 +44,29 @@ export function buttonRect(assets, name, pos) {
   return expandRect(spriteRect(assets, name, pos.x, pos.y), MIN_TOUCH_SIZE, MIN_TOUCH_SIZE);
 }
 
+/** Blits one frame of a sprite scaled about its own registration point. */
+function drawScaled(ctx, assets, name, index, x, y, scaleX, scaleY = scaleX) {
+  const f = assets.frame ? assets.frame(name, index) : null;
+  if (!f || scaleX <= 0 || scaleY <= 0) return;
+  const a = f.anchor || [f.w / 2, f.h / 2];
+  const s = deviceScale(ctx);
+  ctx.save();
+  ctx.imageSmoothingEnabled = f.smooth;
+  ctx.drawImage(
+    f.source,
+    snapToDevice(x - a[0] * scaleX, s), snapToDevice(y - a[1] * scaleY, s),
+    f.w * scaleX, f.h * scaleY,
+  );
+  ctx.restore();
+}
+
 function drawFuel(ctx, assets, fuelValue) {
   drawSprite(ctx, assets, 'fuelBar', 0, FUEL_BAR.x, FUEL_BAR.y);
   const ratio = Math.max(0, Math.min(1, fuelValue / FUEL.MAX));
-  const img = assets.has('fuelFill') ? assets.img('fuelFill', 0) : null;
-  if (img && img.width) {
-    const a = assets.anchor('fuelFill') || [img.width / 2, img.height / 2];
-    const top = FUEL_BAR.y - a[1];
-    const w = Math.round(img.width * ratio);
+  if (assets.has('fuelFill')) {
     // As in the 2013 original (`fuelCount.scaleX = fuel / 100`), the fill shrinks about its
     // registration point, so the capsule contracts towards the middle of the bar.
-    const left = Math.round(FUEL_BAR.x - a[0] * ratio);
-    if (w > 0) ctx.drawImage(img, left, top, w, img.height);
+    drawScaled(ctx, assets, 'fuelFill', 0, FUEL_BAR.x, FUEL_BAR.y, ratio, 1);
   } else {
     const w = Math.round(100 * ratio);
     ctx.fillStyle = '#fff';
@@ -75,12 +90,30 @@ function drawScore(ctx, assets, score) {
   });
 }
 
-// The combo capsule: the redrawn `comboBar` frame — empty, and the same shape as the fuel
-// and score bars — with four `comboCell` muffin icons inside it. A filled cell is drawn
-// solid, an empty one dimmed. The rightmost filled cell is the running timer: it burns
-// down from the top, so it fades into an empty cell just as it goes out.
+// The combo capsule: the same capsule shape as the fuel and score bars, with four muffin
+// icons inside it. A filled cell is drawn solid, an empty one dimmed. The rightmost filled
+// cell is the running timer: it burns down from the top, so it fades into an empty cell
+// just as it goes out. The icon is the `muffin` sprite at half size, which is exactly what
+// the original cell art was cut down from.
 const COMBO_CELL_PITCH = 21;
+const COMBO_CELL_SCALE = 0.5;
 const COMBO_DIM_ALPHA = 0.22;
+
+/** The rectangle one combo cell covers, from the muffin's own logical size. */
+function cellRect(assets, x) {
+  const wh = assets.size ? assets.size('muffin') : null;
+  if (!wh) return { x, y: COMBO_BAR.y, w: 0, h: 0 };
+  const a = assets.anchor('muffin') || [wh[0] / 2, wh[1] / 2];
+  return {
+    x: x - a[0] * COMBO_CELL_SCALE,
+    y: COMBO_BAR.y - a[1] * COMBO_CELL_SCALE,
+    w: wh[0] * COMBO_CELL_SCALE,
+    h: wh[1] * COMBO_CELL_SCALE,
+  };
+}
+
+const drawCell = (ctx, assets, x) =>
+  drawScaled(ctx, assets, 'muffin', 0, x, COMBO_BAR.y, COMBO_CELL_SCALE);
 
 /** Draws the muffin icon clipped to the rows [top, top + height) of its own rectangle. */
 function drawCellBand(ctx, assets, x, rect, top, height, alpha) {
@@ -90,7 +123,7 @@ function drawCellBand(ctx, assets, x, rect, top, height, alpha) {
   ctx.rect(rect.x, top, rect.w, height);
   ctx.clip();
   ctx.globalAlpha = alpha;
-  drawSprite(ctx, assets, 'comboCell', 0, x, COMBO_BAR.y);
+  drawCell(ctx, assets, x);
   ctx.restore();
 }
 
@@ -102,7 +135,7 @@ function drawCombo(ctx, assets, combo) {
     const filled = i < combo.cells;
     if (filled && i === combo.cells - 1) {
       // The draining cell: lit below the split line, dimmed above it.
-      const rect = spriteRect(assets, 'comboCell', x, COMBO_BAR.y);
+      const rect = cellRect(assets, x);
       const split = drainSplitY(rect.y, rect.h, comboDrain(combo));
       drawCellBand(ctx, assets, x, rect, rect.y, split - rect.y, COMBO_DIM_ALPHA);
       drawCellBand(ctx, assets, x, rect, split, rect.y + rect.h - split, 1);
@@ -110,7 +143,7 @@ function drawCombo(ctx, assets, combo) {
     }
     ctx.save();
     ctx.globalAlpha = filled ? 1 : COMBO_DIM_ALPHA;
-    drawSprite(ctx, assets, 'comboCell', 0, x, COMBO_BAR.y);
+    drawCell(ctx, assets, x);
     ctx.restore();
   }
 }
