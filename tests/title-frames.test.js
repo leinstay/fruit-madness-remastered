@@ -1,6 +1,7 @@
 // tests/title-frames.test.js — the pure half of js/core/title-frames.js: cutting one
-// frame out of the single-file title animation by string slicing, and the little LRU
-// that keeps the rasterised frames from eating the machine. No DOM, no canvas.
+// frame out of the single-file title animation by string slicing, and the arithmetic of
+// the cache that holds the loop as one base frame plus the tiles that change.
+// No DOM, no canvas.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,12 +10,17 @@ import { fileURLToPath } from 'node:url';
 
 import {
   sliceTitleFrames, buildFrameParts, buildFrameDocument, buildFullFrameDocument,
-  referencedIds, resolveDefinitions, createFrameCache, frameCacheBytes,
-  FRAME_CACHE_LIMIT, MAX_TITLE_SCALE,
+  referencedIds, resolveDefinitions,
+  tileGrid, changedTiles, packPatchAtlas, preparationOrder, shownKeyframe,
+  projectedCacheBytes, nextTitleScale, titleCacheScale,
+  TILE_SIZE, TILE_TOLERANCE, MAX_TITLE_SCALE, TITLE_SCALE_STEPS, TITLE_CACHE_BUDGET_BYTES,
 } from '../js/core/title-frames.js';
+import { frameAt } from '../js/core/anim.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = path.join(ROOT, 'assets', 'sprites', 'titleBg.svg');
+const MANIFEST = path.join(ROOT, 'assets', 'manifest.json');
+const FIELD = [600, 450];
 
 /** A miniature file in exactly the shape tools/make-title.py writes. */
 const toy = [
@@ -189,43 +195,243 @@ test('the one raster of the artwork travels with the frames that show it', () =>
   }
 });
 
-test('the frame cache never holds more than its limit', () => {
-  const cache = createFrameCache(3);
-  assert.deepEqual(cache.set('a', 1), []);
-  cache.set('b', 2);
-  cache.set('c', 3);
-  assert.equal(cache.size, 3);
-  assert.deepEqual(cache.set('d', 4), [1], 'the least recently used is evicted');
-  assert.deepEqual(cache.keys(), ['b', 'c', 'd']);
-  assert.equal(cache.get('a'), null);
-  assert.equal(cache.get('b'), 2);
-  assert.deepEqual(cache.keys(), ['c', 'd', 'b'], 'a hit counts as a use');
-  assert.deepEqual(cache.set('e', 5), [3], 'c was the oldest now');
-  cache.set('e', 6);
-  assert.equal(cache.size, 3, 'replacing a key does not grow the cache');
-  assert.equal(cache.get('e'), 6);
-  assert.deepEqual(cache.clear().sort(), [2, 4, 6]);
-  assert.equal(cache.size, 0);
+// --- The tile grid --------------------------------------------------------------------
+
+test('the tile grid is the field cut into whole logical tiles', () => {
+  assert.equal(TILE_SIZE, 50);
+  const grid = tileGrid(FIELD, 1);
+  assert.equal(grid.cols, 12);
+  assert.equal(grid.rows, 9);
+  assert.equal(grid.rects.length, 108);
+  assert.equal(grid.width, 600);
+  assert.equal(grid.height, 450);
+  // Row-major: the second tile is the one to the right of the first.
+  assert.deepEqual(grid.rects[0], { x: 0, y: 0, w: 50, h: 50 });
+  assert.deepEqual(grid.rects[1], { x: 50, y: 0, w: 50, h: 50 });
+  assert.deepEqual(grid.rects[12], { x: 0, y: 50, w: 50, h: 50 });
 });
 
-test('a bad limit still gives a usable cache of one', () => {
-  for (const bad of [0, -3, NaN, undefined]) {
-    const cache = createFrameCache(bad);
-    assert.ok(cache.limit >= 1, `limit ${bad}`);
-    cache.set('a', 1);
-    cache.set('b', 2);
-    assert.ok(cache.size <= cache.limit);
+test('tile rects tile the canvas at fractional scales, with no gaps', () => {
+  for (const scale of [1, 1.25, 1.5, 1.7, 2, 2.5, 3]) {
+    const grid = tileGrid(FIELD, scale);
+    assert.equal(grid.width, Math.ceil(FIELD[0] * scale), `width at ${scale}`);
+    assert.equal(grid.height, Math.ceil(FIELD[1] * scale), `height at ${scale}`);
+    for (const r of grid.rects) {
+      assert.ok(r.w >= 1 && r.h >= 1, `empty tile at ${scale}`);
+      assert.ok(r.x >= 0 && r.y >= 0, `tile before the origin at ${scale}`);
+      assert.ok(r.x + r.w <= grid.width, `tile past the right edge at ${scale}`);
+      assert.ok(r.y + r.h <= grid.height, `tile past the bottom edge at ${scale}`);
+    }
+    // Left/top floored, right/bottom ceiled: neighbours touch or overlap by one device
+    // pixel, and never leave a gap between them.
+    for (let row = 0; row < grid.rows; row += 1) {
+      for (let col = 0; col < grid.cols; col += 1) {
+        const r = grid.rects[row * grid.cols + col];
+        if (col === 0) assert.equal(r.x, 0, `first column at ${scale}`);
+        if (row === 0) assert.equal(r.y, 0, `first row at ${scale}`);
+        if (col === grid.cols - 1) assert.equal(r.x + r.w, grid.width, `last column at ${scale}`);
+        if (row === grid.rows - 1) assert.equal(r.y + r.h, grid.height, `last row at ${scale}`);
+        if (col + 1 < grid.cols) {
+          const next = grid.rects[row * grid.cols + col + 1];
+          const overlap = r.x + r.w - next.x;
+          assert.ok(overlap >= 0, `column gap at ${scale}`);
+          assert.ok(overlap <= 1, `column overlap ${overlap} at ${scale}`);
+        }
+        if (row + 1 < grid.rows) {
+          const below = grid.rects[(row + 1) * grid.cols + col];
+          const overlap = r.y + r.h - below.y;
+          assert.ok(overlap >= 0, `row gap at ${scale}`);
+          assert.ok(overlap <= 1, `row overlap ${overlap} at ${scale}`);
+        }
+      }
+    }
   }
 });
 
-test('a full cache of title frames stays within its memory budget', () => {
-  // The title frame is the whole field, so the cap on the render scale is what keeps
-  // this in hand: 6 frames of 1200x900 RGBA is about 26 MB, and three device pixels per
-  // logical one would be more than twice that.
-  assert.equal(FRAME_CACHE_LIMIT, 6);
+test('every device pixel of the canvas belongs to at least one tile', () => {
+  const grid = tileGrid(FIELD, 1.25);
+  const seen = new Uint8Array(grid.width * grid.height);
+  for (const r of grid.rects) {
+    for (let y = r.y; y < r.y + r.h; y += 1) {
+      for (let x = r.x; x < r.x + r.w; x += 1) seen[y * grid.width + x] += 1;
+    }
+  }
+  for (let i = 0; i < seen.length; i += 1) {
+    assert.ok(seen[i] >= 1, `pixel ${i} is in no tile`);
+    assert.ok(seen[i] <= 4, `pixel ${i} is in ${seen[i]} tiles`);
+  }
+});
+
+test('an odd field size still gets whole tiles that end on the canvas edge', () => {
+  const grid = tileGrid([130, 60], 1, 50);
+  assert.equal(grid.cols, 3);
+  assert.equal(grid.rows, 2);
+  assert.deepEqual(grid.rects[2], { x: 100, y: 0, w: 30, h: 50 });
+  assert.deepEqual(grid.rects[5], { x: 100, y: 50, w: 30, h: 10 });
+});
+
+// --- The tile diff --------------------------------------------------------------------
+
+/** An opaque RGBA buffer of `w` x `h` filled with one colour. */
+function buffer(w, h, value = 10) {
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = value; data[i + 1] = value; data[i + 2] = value; data[i + 3] = 255;
+  }
+  return data;
+}
+
+test('a tile differs only when a channel differs by more than the tolerance', () => {
+  assert.equal(TILE_TOLERANCE, 2);
+  const grid = tileGrid([4, 2], 1, 2);          // two tiles of 2x2
+  assert.equal(grid.rects.length, 2);
+  const base = buffer(4, 2);
+  const shot = buffer(4, 2);
+  assert.deepEqual(changedTiles(shot, base, grid.width, grid.rects), [],
+    'the same drawing rasterises identically');
+
+  // Renderer noise inside the tolerance is not a change.
+  shot[0] += 2;
+  assert.deepEqual(changedTiles(shot, base, grid.width, grid.rects), []);
+  shot[0] += 1;                                  // now 3 away
+  assert.deepEqual(changedTiles(shot, base, grid.width, grid.rects), [0]);
+
+  // A pixel in the right-hand tile, on the second row, and the alpha channel too.
+  const other = buffer(4, 2);
+  other[(1 * 4 + 3) * 4 + 3] = 200;              // x=3, y=1, alpha
+  assert.deepEqual(changedTiles(other, base, grid.width, grid.rects), [1]);
+
+  const both = buffer(4, 2);
+  both[1] = 255;                                 // x=0, y=0, green
+  both[(1 * 4 + 2) * 4 + 2] = 255;               // x=2, y=1, blue
+  assert.deepEqual(changedTiles(both, base, grid.width, grid.rects), [0, 1]);
+});
+
+test('the diff only looks inside its own tile', () => {
+  const grid = tileGrid([4, 2], 1, 2);
+  const base = buffer(4, 2);
+  const shot = buffer(4, 2);
+  // Every pixel of the left tile, nothing of the right one.
+  for (const [x, y] of [[0, 0], [1, 0], [0, 1], [1, 1]]) shot[(y * 4 + x) * 4] = 255;
+  assert.deepEqual(changedTiles(shot, base, grid.width, grid.rects), [0]);
+  assert.deepEqual(changedTiles(shot, base, grid.width, [grid.rects[1]]), []);
+});
+
+// --- Packing the patches --------------------------------------------------------------
+
+test('the changed tiles are packed into one row-major strip', () => {
+  const grid = tileGrid(FIELD, 2);
+  const atlas = packPatchAtlas(grid.rects, [0, 13, 107]);
+  assert.equal(atlas.patches.length, 3);
+  assert.equal(atlas.width, 300, 'three 100 px tiles side by side');
+  assert.equal(atlas.height, 100);
+  assert.equal(atlas.bytes, 300 * 100 * 4);
+  assert.deepEqual(atlas.patches[0], { sx: 0, sy: 0, dx: 0, dy: 0, w: 100, h: 100 });
+  assert.deepEqual(atlas.patches[1], { sx: 100, sy: 0, dx: 100, dy: 100, w: 100, h: 100 });
+  assert.deepEqual(atlas.patches[2], { sx: 200, sy: 0, dx: 1100, dy: 800, w: 100, h: 100 });
+});
+
+test('a keyframe that changes nothing costs no atlas at all', () => {
+  const grid = tileGrid(FIELD, 1);
+  const atlas = packPatchAtlas(grid.rects, []);
+  assert.deepEqual(atlas.patches, []);
+  assert.equal(atlas.width, 0);
+  assert.equal(atlas.height, 0);
+  assert.equal(atlas.bytes, 0);
+});
+
+test('tiles of different sizes still pack without overlapping', () => {
+  const grid = tileGrid([130, 60], 1, 50);       // the last column is 30 wide, the last row 10 high
+  const atlas = packPatchAtlas(grid.rects, [2, 3, 5]);
+  assert.equal(atlas.width, 30 + 50 + 30);
+  assert.equal(atlas.height, 50, 'as tall as the tallest tile packed');
+  assert.deepEqual(atlas.patches.map((p) => p.sx), [0, 30, 80]);
+  assert.deepEqual(atlas.patches.map((p) => [p.w, p.h]), [[30, 50], [50, 10], [30, 10]]);
+  // Nothing in the strip overlaps anything else.
+  for (let i = 1; i < atlas.patches.length; i += 1) {
+    const prev = atlas.patches[i - 1];
+    assert.ok(prev.sx + prev.w <= atlas.patches[i].sx, `patch ${i} overlaps its neighbour`);
+  }
+});
+
+// --- What to show, and in what order to prepare it --------------------------------------
+
+test('the loop is prepared in timeline order from the playhead', () => {
+  assert.deepEqual(preparationOrder(5, 0), [0, 1, 2, 3, 4]);
+  assert.deepEqual(preparationOrder(5, 3), [3, 4, 0, 1, 2]);
+  assert.deepEqual(preparationOrder(5, 7), [2, 3, 4, 0, 1], 'the playhead wraps');
+  assert.deepEqual(preparationOrder(5, -1), [4, 0, 1, 2, 3]);
+  assert.deepEqual(preparationOrder(1, 0), [0]);
+  assert.deepEqual(preparationOrder(0, 0), []);
+});
+
+test('an unprepared keyframe shows the most recent prepared one, never a later one', () => {
+  const prepared = [true, true, false, false, true];
+  assert.equal(shownKeyframe(prepared, 1), 1, 'a prepared keyframe shows itself');
+  assert.equal(shownKeyframe(prepared, 2), 1);
+  assert.equal(shownKeyframe(prepared, 3), 1, 'not 4, which is later in the loop');
+  assert.equal(shownKeyframe(prepared, 4), 4);
+  // The sweep starts at the playhead, so the prepared run can straddle the wrap.
+  assert.equal(shownKeyframe([false, false, true, true, true], 0), 4, 'wrapping back is fine');
+  assert.equal(shownKeyframe([false, false, true, true, true], 1), 4);
+  assert.equal(shownKeyframe(new Array(5).fill(false), 3), -1, 'nothing is ready yet');
+  assert.equal(shownKeyframe([], 0), -1);
+  assert.equal(shownKeyframe([true, false], 5), 0, 'the wanted index wraps too');
+});
+
+// --- The memory budget ------------------------------------------------------------------
+
+test('the scale steps down when the whole loop would not fit the budget', () => {
+  assert.equal(TITLE_CACHE_BUDGET_BYTES, 64 * 1024 * 1024);
   assert.equal(MAX_TITLE_SCALE, 2);
-  const bytes = frameCacheBytes(FRAME_CACHE_LIMIT, [600, 450], MAX_TITLE_SCALE);
-  assert.equal(bytes, 6 * 1200 * 900 * 4);
-  assert.ok(bytes <= 26 * 1000 * 1000, `${bytes} bytes at the cap`);
-  assert.ok(frameCacheBytes(FRAME_CACHE_LIMIT, [600, 450], 1) <= bytes / 4 + 1);
+  assert.deepEqual(TITLE_SCALE_STEPS, [2, 1.5, 1]);
+
+  assert.equal(titleCacheScale(3), 2, 'the cap holds');
+  assert.equal(titleCacheScale(1.25), 1.25, 'below the cap the display scale is used as it is');
+  assert.equal(titleCacheScale(0), 1);
+  assert.equal(titleCacheScale(NaN), 1);
+
+  assert.equal(nextTitleScale(2), 1.5);
+  assert.equal(nextTitleScale(1.75), 1.5, 'an in-between scale drops to the step below it');
+  assert.equal(nextTitleScale(1.5), 1);
+  assert.equal(nextTitleScale(1), null, 'scale 1 is the floor');
+  assert.equal(nextTitleScale(0.5), null);
+});
+
+test('the cache size is projected from the keyframes prepared so far', () => {
+  const base = 4 * 1024 * 1024;
+  assert.equal(projectedCacheBytes(base, 0, 0, 30), base, 'nothing measured yet');
+  assert.equal(projectedCacheBytes(base, 300, 3, 30), base + 3000);
+  assert.equal(projectedCacheBytes(base, 0, 30, 30), base, 'a loop that never changes costs the base');
+  // The whole loop as full frames is what this replaces: 134 MB at scale 2 is over the
+  // budget, 33.5 MB at scale 1 is not — and the patches have to bring 2 under it.
+  const full = (scale) => 31 * Math.ceil(600 * scale) * Math.ceil(450 * scale) * 4;
+  assert.ok(full(2) > TITLE_CACHE_BUDGET_BYTES, `${full(2)} bytes of full frames at scale 2`);
+  assert.ok(full(1) < TITLE_CACHE_BUDGET_BYTES, `${full(1)} bytes of full frames at scale 1`);
+  // Even the pathological loop in which every tile of every keyframe changes fits at
+  // scale 1, so dropping to the floor always succeeds.
+  const grid = tileGrid(FIELD, 1);
+  const worst = packPatchAtlas(grid.rects, grid.rects.map((_, i) => i)).bytes;
+  assert.ok(projectedCacheBytes(grid.width * grid.height * 4, worst * 30, 30, 30)
+    <= TITLE_CACHE_BUDGET_BYTES, 'the worst case at scale 1 must fit');
+});
+
+test('the keyframes follow the manifest durations, 31 of them per 40 ticks', () => {
+  const entry = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')).vectors.titleBg;
+  const { durations, frameCount } = entry;
+  assert.equal(frameCount, 31);
+  assert.equal(durations.length, 31);
+  const loop = durations.reduce((a, b) => a + b, 0);
+  assert.equal(loop, 40, 'the loop is 40 ticks, i.e. 46.5 keyframe changes a second');
+  // Every keyframe is shown, in order, for exactly its recorded number of ticks.
+  const shown = [];
+  for (let tick = 0; tick < loop; tick += 1) shown.push(frameAt(durations, frameCount, tick));
+  assert.deepEqual([...new Set(shown)], durations.map((_, i) => i), 'all 31, in order');
+  for (let i = 0; i < frameCount; i += 1) {
+    assert.equal(shown.filter((f) => f === i).length, durations[i], `keyframe ${i} holds`);
+  }
+  assert.equal(frameAt(durations, frameCount, loop), 0, 'and then it starts again');
+  // Which is why the cache has to hold the whole loop: at 60 Hz the animation asks for a
+  // different keyframe 46.5 times a second, and each one costs ~19 ms to rasterise.
+  assert.equal((60 * frameCount) / loop, 46.5);
 });
