@@ -420,8 +420,9 @@ const now = () => (typeof performance === 'object' && performance && typeof perf
  * A change of render scale throws the cache away and prepares it again at the new scale,
  * showing the old base stretched in the meantime, so the screen never goes blank.
  *
- * `failed()` is true once the file could not be fetched or a keyframe could not be
- * decoded; from then on the caller should draw the 2013 raster frames instead.
+ * `failed()` is true once the file could not be fetched or a keyframe could not be decoded;
+ * from then on `draw` returns false without painting, one warning has named the title, and
+ * the caller keeps whatever it draws behind the artwork.
  */
 export function createTitleFrames({
   url,
@@ -465,10 +466,12 @@ export function createTitleFrames({
   let prepareMs = 0;          // summed time in the diff and the packing
   let prepareWallMs = 0;      // wall clock from the first keyframe to the last
 
+  // Said once, never per frame: from here on `draw` paints nothing and the menu keeps its
+  // own flat backdrop, with its labels and buttons, which never needed the artwork.
   function fail(err) {
     if (status === 'failed') return;
     status = 'failed';
-    console.warn('title: falling back to the raster frames:', err);
+    console.warn('title: the artwork could not be shown:', err);
   }
 
   function start() {

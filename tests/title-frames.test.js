@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   sliceTitleFrames, buildFrameParts, buildFrameDocument, buildFullFrameDocument,
-  referencedIds, resolveDefinitions,
+  referencedIds, resolveDefinitions, createTitleFrames,
   tileGrid, changedTiles, packPatchAtlas, preparationOrder, shownKeyframe,
   projectedCacheBytes, nextTitleScale, titleCacheScale,
   TILE_SIZE, TILE_TOLERANCE, MAX_TITLE_SCALE, TITLE_SCALE_STEPS, TITLE_CACHE_BUDGET_BYTES,
@@ -417,7 +417,7 @@ test('the cache size is projected from the keyframes prepared so far', () => {
 });
 
 test('the keyframes follow the manifest durations, 31 of them per 40 ticks', () => {
-  const entry = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')).vectors.titleBg;
+  const entry = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')).sprites.titleBg;
   const { durations, frameCount } = entry;
   assert.equal(frameCount, 31);
   assert.equal(durations.length, 31);
@@ -434,4 +434,63 @@ test('the keyframes follow the manifest durations, 31 of them per 40 ticks', () 
   // Which is why the cache has to hold the whole loop: at 60 Hz the animation asks for a
   // different keyframe 46.5 times a second, and each one costs ~19 ms to rasterise.
   assert.equal((60 * frameCount) / loop, 46.5);
+});
+
+// --- when the artwork does not arrive ---------------------------------------------------
+
+/** A canvas context that records nothing but the fact that it was drawn on. */
+function stubContext() {
+  const calls = [];
+  return {
+    calls,
+    save() { calls.push('save'); },
+    restore() { calls.push('restore'); },
+    drawImage() { calls.push('drawImage'); },
+    setTransform() { calls.push('setTransform'); },
+    getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
+  };
+}
+
+/** Runs `body` with console.warn captured, and gives back what it said. */
+async function withWarnings(body) {
+  const said = [];
+  const real = console.warn;
+  console.warn = (...args) => said.push(args.map(String).join(' '));
+  try {
+    await body();
+  } finally {
+    console.warn = real;
+  }
+  return said;
+}
+
+test('a title file that cannot be fetched paints nothing and complains once', async () => {
+  // There is no second copy of the artwork: when the file is unusable the title simply is
+  // not painted, and the menu keeps the flat backdrop it drew before calling in — with its
+  // labels and its three buttons, which are runtime text and never depended on the art.
+  const ctx = stubContext();
+  const warnings = await withWarnings(async () => {
+    const title = createTitleFrames({ url: 'titleBg.svg', loadText: () => Promise.reject(new Error('HTTP 500')) });
+    assert.equal(title.draw(ctx, 0, 1), false, 'nothing is ready on the first frame');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(title.failed(), true, 'and the file is given up on');
+    for (let frame = 0; frame < 5; frame += 1) {
+      assert.equal(title.draw(ctx, frame, 1), false, `frame ${frame} paints nothing`);
+    }
+  });
+  assert.equal(warnings.length, 1, `expected one warning, got ${warnings.length}`);
+  assert.match(warnings[0], /title/i);
+  assert.ok(!ctx.calls.includes('drawImage'), 'nothing was ever blitted');
+});
+
+test('a title file in the wrong shape is given up on just as quietly', async () => {
+  const ctx = stubContext();
+  const warnings = await withWarnings(async () => {
+    const title = createTitleFrames({ url: 'titleBg.svg', loadText: () => Promise.resolve('<html>nope</html>') });
+    title.draw(ctx, 0, 1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(title.failed(), true);
+    assert.equal(title.draw(ctx, 1, 1), false);
+  });
+  assert.equal(warnings.length, 1);
 });

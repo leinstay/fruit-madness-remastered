@@ -1,22 +1,26 @@
 // Manifest-driven image loader.
 // `normalizeSpriteEntry` is pure (Node-testable); the image loading itself is browser-only.
 //
-// A sprite entry in assets/manifest.json has one of four forms:
-//   "path.png"
-//   { "file": "path.png", "anchor": [x, y] }
+// The game draws one set of art: the vector drawings of the 2013 symbols. A sprite entry in
+// assets/manifest.json has one of four forms:
+//   "path.svg"
+//   { "file": "path.svg", "anchor": [x, y] }
 //   { "frames": [...], "fps": n, "anchor"?: [x, y] }
 //   { "frames": [...], "durations": [ticks...], "anchor"?: [x, y] }
-// `anchor` is in image pixels from the top-left; absent means the image centre.
-//
-// The manifest's "vectors" map uses the same forms for the SVG versions of the same
-// symbols, with three extra fields: `size` is the exact logical viewport [w, h] (fractional,
-// so the image centre is no longer a safe default and `anchor` is always spelled out),
-// `notext` names a variant of the file with the baked-in caption removed, and `textOnly`
-// marks a symbol that is nothing but its caption and has no artwork to draw at all.
+// plus three fields of its own: `size` is the exact logical viewport [w, h] (fractional, so
+// the image centre is not a safe default and `anchor` is always spelled out), `notext` names
+// a variant of the file with the baked-in caption removed, and `textOnly` marks a symbol
+// that is nothing but its caption and has no artwork to draw at all.
+// `anchor` is in logical pixels from the top-left of that viewport.
 //
 // A fifth form, `layered`, is one file holding every frame of an animation at once (the
 // title screen). It is too big to hold as bitmaps and is not blitted like a sprite, so the
 // loader only hands the entry over — js/core/title-frames.js does the rest.
+//
+// A drawing that does not arrive is asked for once more and then given up on: the key is
+// named in a single warning and simply is not drawn. Nothing the game does depends on its
+// art — the physics, the collisions and the captions are all independent of it — so a
+// missing file costs a picture and never a playable game.
 import { W, H } from '../config.js';
 import { deviceScale, snapToDevice } from './canvas.js';
 
@@ -83,26 +87,57 @@ export function layeredEntry(entry) {
 }
 
 /**
- * Where a sprite is really drawn from. The manifest's `vectors` map holds the original
- * artwork; `sprites` holds the 2013 renders of the same symbols.
+ * Which files a sprite is really drawn from:
  *
  *   'vector'  the SVG frames, rasterised once per device scale (the art is resolution-free)
- *   'raster'  the PNG frames, blitted unsmoothed
- *
  *   'none'    nothing is loaded: the symbol is nothing but its caption (`textOnly`), which
  *             js/scenes/captions.js draws in the game's own font
  *
  * A symbol that carries both art and a caption ships a `notext` variant; that variant is
  * what gets drawn, and the caption is drawn over it at runtime.
+ *
+ * An entry that cannot say how big its drawing is could only be placed by guesswork, so it
+ * is rejected here and the loader skips that one key.
  */
-export function spriteSource(spec, vector) {
-  const usable = vector && Array.isArray(vector.size) && vector.size[0] > 0 && vector.size[1] > 0;
-  if (!usable) {
-    return { kind: 'raster', frames: spec.frames, timing: spec.timing, anchor: spec.anchor, size: null };
+export function spriteSource(spec) {
+  if (!spec || !Array.isArray(spec.size) || !(spec.size[0] > 0) || !(spec.size[1] > 0)) {
+    throw new Error('spriteSource: a sprite entry needs a positive size');
   }
-  if (vector.textOnly) return { kind: 'none', frames: [], timing: null, anchor: vector.anchor, size: vector.size };
-  const frames = vector.notext ? [vector.notext] : vector.frames;
-  return { kind: 'vector', frames, timing: vector.timing, anchor: vector.anchor, size: vector.size };
+  if (spec.textOnly) return { kind: 'none', frames: [], timing: null, anchor: spec.anchor, size: spec.size };
+  const frames = spec.notext ? [spec.notext] : spec.frames;
+  return { kind: 'vector', frames, timing: spec.timing, anchor: spec.anchor, size: spec.size };
+}
+
+/**
+ * The URL to ask for a frame that did not arrive the first time. The query makes it a
+ * different resource as far as the cache is concerned, so a transient failure that the
+ * browser has already memoised is not simply replayed.
+ */
+export function retryUrl(url, token = Date.now()) {
+  return `${url}${String(url).includes('?') ? '&' : '?'}retry=${token}`;
+}
+
+/**
+ * What to make of a sprite's frames once every load has settled: which images can be used,
+ * whether the recorded timing still describes them, whether the key is worth keeping at
+ * all, and the **single** warning to print for it (null when nothing went wrong).
+ *
+ * One line per key, naming the key, whether it lost one frame or all of them: a failure
+ * has to be visible in the console without being able to flood it.
+ */
+export function frameOutcome(name, images, timing = null) {
+  const usable = images.filter(Boolean);
+  if (usable.length === 0) {
+    return { images: usable, timing: null, drop: true, warning: `assets: "${name}" could not be loaded and is not drawn` };
+  }
+  if (usable.length === images.length) return { images: usable, timing, drop: false, warning: null };
+  return {
+    images: usable,
+    // Some frames are gone, so the per-frame holds no longer line up: hold frame 0 instead.
+    timing: Array.isArray(timing) ? null : timing,
+    drop: false,
+    warning: `assets: "${name}" is missing ${images.length - usable.length} of ${images.length} frames`,
+  };
 }
 
 /** The offscreen bitmap one vector frame needs at `scale`, in whole device pixels. */
@@ -126,12 +161,18 @@ function loadImage(url) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => {
-      console.warn(`assets: failed to load ${url}`);
-      resolve(null);
-    };
+    img.onerror = () => resolve(null);
     img.src = url;
   });
+}
+
+/**
+ * One frame, with a second attempt past the cache. Nothing is said here: the whole sprite
+ * is reported once, by `frameOutcome`, after every one of its frames has settled.
+ */
+async function loadFrame(url) {
+  const first = await loadImage(url);
+  return first || loadImage(retryUrl(url));
 }
 
 function makeCanvas(w, h) {
@@ -158,10 +199,10 @@ function rasteriseFrame(image, size, scale) {
   return canvas;
 }
 
-// Loads every sprite in the manifest. A missing or broken image never rejects the whole
-// load: it is logged and the sprite simply reports has(name) === false.
+// Loads every sprite in the manifest. A missing or broken drawing never rejects the whole
+// load: the key is named once and simply reports has(name) === false from then on.
 export async function loadAssets(manifestUrl) {
-  let manifest = { sprites: {}, vectors: {}, audio: {}, fonts: {} };
+  let manifest = { sprites: {}, audio: {}, fonts: {} };
   try {
     const res = await fetch(manifestUrl, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -170,37 +211,25 @@ export async function loadAssets(manifestUrl) {
     console.warn(`assets: could not load the manifest ${manifestUrl}:`, err);
   }
 
-  const vectors = new Map();
-  const layers = new Map();
-  for (const [name, entry] of Object.entries(manifest.vectors || {})) {
-    try {
-      const layered = layeredEntry(entry);
-      if (layered) layers.set(name, layered);
-      else vectors.set(name, normalizeSpriteEntry(entry));
-    } catch (err) {
-      console.warn(`assets: skipping vector "${name}":`, err);
-    }
-  }
-
-  const sprites = new Map();
-  const specs = new Map();
+  const specs = new Map();    // every key that has a box, drawn or not
+  const layers = new Map();   // the symbols that live in one file of their own
+  const sprites = new Map();  // the ones with images to blit
   const jobs = [];
   for (const [name, entry] of Object.entries(manifest.sprites || {})) {
+    let source;
     let spec;
     try {
+      const layered = layeredEntry(entry);
+      if (layered) { layers.set(name, layered); continue; }
       spec = normalizeSpriteEntry(entry);
+      source = spriteSource(spec);
     } catch (err) {
       console.warn(`assets: skipping sprite "${name}":`, err);
       continue;
     }
     specs.set(name, spec);
-    // A layered symbol is drawn from its one SVG file. Its raster frames are the fallback
-    // and are only fetched if that ever fails, so nothing of them is downloaded normally.
-    if (layers.has(name)) continue;
-    const source = spriteSource(spec, vectors.get(name) || null);
     if (source.kind === 'none') continue;   // drawn as text, nothing to fetch
     const record = {
-      kind: source.kind,
       images: new Array(source.frames.length).fill(null),
       bitmaps: null,
       timing: source.timing,
@@ -209,37 +238,19 @@ export async function loadAssets(manifestUrl) {
     };
     sprites.set(name, record);
     source.frames.forEach((url, i) => {
-      jobs.push(loadImage(url).then((img) => { record.images[i] = img; }));
+      jobs.push(loadFrame(url).then((img) => { record.images[i] = img; }));
     });
   }
   await Promise.all(jobs);
 
-  // A vector that would not load falls back to the 2013 render of the same symbol, so a
-  // sprite can never go missing because one SVG failed.
-  const retries = [];
+  // Every frame has been asked for twice by now. Whatever arrived is what the sprite has;
+  // a key that lost frames says so once and the game carries on without that picture.
   for (const [name, record] of sprites) {
-    if (record.kind !== 'vector' || record.images.every(Boolean)) continue;
-    console.warn(`assets: "${name}" falls back to its raster frames`);
-    const spec = specs.get(name);
-    record.kind = 'raster';
-    record.size = null;
-    record.anchor = spec.anchor;
-    record.timing = spec.timing;
-    record.images = new Array(spec.frames.length).fill(null);
-    spec.frames.forEach((url, i) => {
-      retries.push(loadImage(url).then((img) => { record.images[i] = img; }));
-    });
-  }
-  await Promise.all(retries);
-
-  for (const [name, record] of sprites) {
-    record.images = record.images.filter(Boolean);
-    if (record.images.length === 0) {
-      console.warn(`assets: sprite "${name}" has no usable frames`);
-      sprites.delete(name);
-    } else if (Array.isArray(record.timing) && record.timing.length !== record.images.length) {
-      record.timing = null; // some frames were lost; fall back to a static sprite
-    }
+    const outcome = frameOutcome(name, record.images, record.timing);
+    if (outcome.warning) console.warn(outcome.warning);
+    if (outcome.drop) { sprites.delete(name); continue; }
+    record.images = outcome.images;
+    record.timing = outcome.timing;
   }
 
   // The scale the vector frames are currently rasterised at.
@@ -253,7 +264,6 @@ export async function loadAssets(manifestUrl) {
     const s = Number.isFinite(scale) && scale > 0 ? scale : 1;
     if (s === rasterScale) return;
     for (const record of sprites.values()) {
-      if (record.kind !== 'vector') continue;
       record.bitmaps = isCacheable(record.size)
         ? record.images.map((image) => rasteriseFrame(image, record.size, s))
         : null;
@@ -273,9 +283,9 @@ export async function loadAssets(manifestUrl) {
 
   /**
    * Everything drawSprite needs for one frame: what to blit, the logical size to blit it
-   * at, the registration point and whether the blit should be smoothed. A vector frame is
+   * at, the registration point and whether the blit should be smoothed. A cached frame is
    * already at the device resolution, so its blit is ~1:1 and smoothing only softens the
-   * sub-pixel remainder; a raster frame is scaled up and must stay hard-edged.
+   * sub-pixel remainder; an uncached one is drawn from the SVG at the destination size.
    */
   const frame = (name, index = 0) => {
     const record = sprites.get(name);
@@ -290,78 +300,32 @@ export async function loadAssets(manifestUrl) {
     }
     const image = record.images[i];
     if (!image || !image.width) return null;
-    if (record.size) {
-      return { source: image, w: record.size[0], h: record.size[1], anchor: record.anchor, smooth: true };
-    }
-    return {
-      source: image, w: image.width, h: image.height,
-      anchor: record.anchor || [image.width / 2, image.height / 2], smooth: false,
-    };
+    return { source: image, w: record.size[0], h: record.size[1], anchor: record.anchor, smooth: true };
   };
 
   /**
-   * The logical size of a sprite: its vector viewport, or the natural size of its PNG.
-   * A symbol that is drawn as text has no frames but still has a box — the scenes lay their
-   * buttons and their tap targets out on it.
+   * The logical size of a sprite: the viewport of its drawing. A symbol that is drawn as
+   * text, and one whose art could not be loaded, have no frames but still have a box — the
+   * scenes lay their buttons and their tap targets out on it.
    */
   const size = (name) => {
-    const record = sprites.get(name);
-    if (!record) {
-      const spec = vectors.get(name) || layers.get(name);
-      return spec && spec.size ? spec.size.slice() : null;
-    }
-    if (record.size) return record.size.slice();
-    const image = record.images[0];
-    return image && image.width ? [image.width, image.height] : null;
+    const record = sprites.get(name) || specs.get(name) || layers.get(name);
+    return record && record.size ? record.size.slice() : null;
   };
 
   const frameCount = (name) => (sprites.has(name) ? sprites.get(name).images.length : 0);
   const timing = (name) => (sprites.has(name) ? sprites.get(name).timing : null);
   const anchor = (name) => {
-    const record = sprites.get(name);
+    const record = sprites.get(name) || specs.get(name) || layers.get(name);
     if (record && record.anchor) return record.anchor;
-    if (!record) {
-      const spec = vectors.get(name) || layers.get(name);
-      if (spec && spec.anchor) return spec.anchor;
-    }
     const wh = size(name);
     return wh ? [wh[0] / 2, wh[1] / 2] : null;
   };
 
-  /** The layered vector entry of a symbol, or null — see js/core/title-frames.js. */
+  /** The layered entry of a symbol, or null — see js/core/title-frames.js. */
   const layered = (name) => layers.get(name) || null;
 
-  /**
-   * Loads the 2013 raster frames of a symbol that was skipped because it is drawn from a
-   * layered vector. This is the fallback for a vector that could not be fetched or
-   * decoded, and is why those frames are not downloaded in the normal case. Resolves to
-   * whether the symbol can be drawn afterwards; calling it twice is harmless.
-   */
-  async function loadRasterFrames(name) {
-    if (sprites.has(name)) return true;
-    const spec = specs.get(name);
-    if (!spec) return false;
-    const images = await Promise.all(spec.frames.map(loadImage));
-    const usable = images.filter(Boolean);
-    if (usable.length === 0) {
-      console.warn(`assets: "${name}" has no usable raster frames either`);
-      return false;
-    }
-    sprites.set(name, {
-      kind: 'raster',
-      images: usable,
-      bitmaps: null,
-      timing: Array.isArray(spec.timing) && spec.timing.length !== usable.length ? null : spec.timing,
-      anchor: spec.anchor,
-      size: null,
-    });
-    return true;
-  }
-
-  return {
-    img, frame, has, size, frameCount, timing, anchor, rasterise,
-    layered, loadRasterFrames, vectors, manifest,
-  };
+  return { img, frame, has, size, frameCount, timing, anchor, rasterise, layered, manifest };
 }
 
 // Draws one frame so that the sprite's anchor (its centre when there is no anchor)
@@ -370,8 +334,6 @@ export async function loadAssets(manifestUrl) {
 //
 // The destination is snapped to a whole device pixel, not to a whole logical one: the
 // canvas is drawn at the display's resolution, so that is where the pixel grid actually is.
-// Raster frames are blitted with smoothing off, which keeps the art that has not been
-// redrawn from its vector source hard-edged at any scale.
 export function drawSprite(ctx, assets, name, frame = 0, x = 0, y = 0, rotationDeg = 0) {
   if (!ctx || !assets || !assets.frame) return;
   const f = assets.frame(name, frame);

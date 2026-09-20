@@ -10,7 +10,6 @@
 // positions the source document gives them.
 // "START" is not part of the artwork either: it is the caption of the `btnStart` symbol.
 import { W, H } from '../config.js';
-import { drawSprite } from '../core/assets.js';
 import { createTitleFrames } from '../core/title-frames.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
@@ -62,30 +61,20 @@ export function createMenuScene() {
   let tick = 0;
   let muted = false;
   // The title animation and its timing. `title` is null when the manifest has no layered
-  // vector for it, and is abandoned for the raster frames if the file cannot be used.
+  // entry for it.
   let title = null;
   let frames = 1;
   let timing = null;
-  let rasterAsked = false;
 
   /**
-   * Draws the title frame for this tick. The vector animation rasterises in the
-   * background and never holds the loop up, so this falls back — first to the most
-   * recent frame the cache has (inside `title.draw`), then to the 2013 raster frames if
-   * the vector file is unusable, and finally to the flat colour the art is painted over.
+   * Draws the title frame for this tick. The artwork rasterises in the background and
+   * never holds the loop up, so this falls back — first to the most recent frame the cache
+   * has (inside `title.draw`), and then to the flat colour the art is painted over. That
+   * last state is also the one the menu keeps for good if the file cannot be used at all:
+   * the labels and all three buttons are runtime text and never depended on the drawing.
    */
   function drawTitle(c, frame) {
-    if (title) {
-      if (title.draw(c, frame, app.renderScale)) return;
-      if (title.failed() && !rasterAsked) {
-        rasterAsked = true;
-        app.assets.loadRasterFrames('titleBg');
-      }
-    }
-    if (app.assets.has('titleBg')) {
-      drawSprite(c, app.assets, 'titleBg', frame, W / 2, H / 2);
-      return;
-    }
+    if (title && title.draw(c, frame, app.renderScale)) return;
     c.fillStyle = TITLE_BG_COLOR;
     c.fillRect(0, 0, W, H);
   }
@@ -135,8 +124,8 @@ export function createMenuScene() {
       // re-download the file or throw the rasterised frames away.
       const layered = app.assets.layered ? app.assets.layered('titleBg') : null;
       if (layered && !title) title = createTitleFrames({ url: layered.file, size: layered.size });
-      frames = layered ? layered.frameCount : app.assets.frameCount('titleBg');
-      timing = layered ? layered.durations : app.assets.timing('titleBg');
+      frames = layered ? layered.frameCount : 1;
+      timing = layered ? layered.durations : null;
       // There is only one music track, and adding another is not allowed, so the title
       // screen plays the same theme the game does; entering the game does not restart it.
       if (app.audio) app.audio.music('mainTheme');

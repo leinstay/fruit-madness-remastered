@@ -5,8 +5,9 @@
 //
 // Every offset is stated relative to its symbol's registration point — the same point
 // drawSprite puts on (x, y) — so a caption is drawn at the very coordinates the sprite is.
-// The numbers were measured from the shipped 2013 renders in assets/sprites/*.png by
-// fitting the ink profile of the caption; they are exact to about a tenth of a pixel.
+// The numbers were measured from the 2013 renders of the symbols (named below as the files
+// they were then) by fitting the ink profile of each caption, and are exact to about a
+// tenth of a pixel. Those renders are reference material, not art the game ships.
 import { drawText, CAP_HEIGHT_RATIO } from '../core/text.js';
 
 /**

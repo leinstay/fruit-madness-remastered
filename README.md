@@ -17,7 +17,7 @@ is built in the spirit of NES-era arcade games.
 
 The original *Fruit Madness* was a Flash game we made in 2013
 ([leinstay/fruitmadness](https://github.com/leinstay/fruitmadness), ActionScript 3). Flash is gone, so this
-is a from-scratch HTML5 remaster: the same physics constants, the same sprites and the same music, rewritten
+is a from-scratch HTML5 remaster: the same physics constants, the same artwork and the same music, rewritten
 in plain JavaScript with no plugin, no build step and no dependencies. The playfield is drawn from the
 original vector artwork at whatever resolution your display really has, and every caption is set in the
 game's own pixel font, so the game stays sharp in any window.
@@ -46,7 +46,7 @@ game's own pixel font, so the game stays sharp in any window.
 
 ## Features
 
-- Original pixel art and music from the 2013 game.
+- The original 2013 artwork and music, drawn from the vectors at your display's own resolution.
 - Attack formations that are always dodgeable — never a wall you could not have slipped through.
 - Eight attack directions and double-sided attacks that come in from two edges at once.
 - Fuel, a four-cell combo multiplier that decays over time and a seven-digit score.
@@ -68,7 +68,7 @@ browsers refuse to load over `file://`.
 ### Tests
 
 ```bash
-node --test tests/          # 214 tests, about 90 seconds
+node --test tests/          # 218 tests, about two minutes
 ```
 
 The long survivability proof is opt-in, because it is slow:
@@ -83,6 +83,8 @@ SOLVER_SEEDS=100 SOLVER_FRAMES=3600 node --test tests/solvability.test.js
 ## Tech
 
 Vanilla JavaScript ES modules, Canvas 2D at a fixed 60 Hz step, no framework, no bundler, no build step.
+Every drawing in the game is the original 2013 artwork as SVG, rasterised at the resolution the display
+really has and re-done when that changes, and every caption is set at runtime in the game's own pixel font.
 The leaderboard is a single Firestore collection, read and written straight from the browser with the
 Firebase web SDK loaded from a CDN.
 
@@ -112,10 +114,11 @@ js/
   game/             player, enemies, formations, director, collisions, combo (pure logic)
   scenes/           menu, game, game over, leaderboard
   services/         the Firestore leaderboard client
-assets/             sprites, font, music and sound effects
+assets/             the vector artwork, the pixel font, music and sound effects
 tests/              node --test suites, including the survivability simulator
-tools/              the scripts that build the sprites, including xfl2svg.py, which
-                    converts drawings from the original 2013 Flash source document to SVG
+tools/              make-svg-sprites.mjs prepares the gameplay drawings, make-title.py
+                    builds the title screen, and xfl2svg.py converts drawings from the
+                    original 2013 Flash source document to SVG
 firestore.rules     the leaderboard security rules
 ```
 
