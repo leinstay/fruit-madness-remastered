@@ -1,20 +1,18 @@
 #!/usr/bin/env node
-// tools/make-sprites.mjs — regenerates the small HUD and event sprites that are derived
-// directly from the extracted 2013 art.
+// tools/make-sprites.mjs — regenerates the small HUD sprites that are derived directly
+// from the extracted 2013 art.
 //
 // Run with `node tools/make-sprites.mjs` from the repository root. It is deterministic and
 // idempotent: the same inputs always produce byte-identical PNGs.
 //
-//   berry         one ball of the extracted `cherry` sprite, halved — literally derived from it.
 //   comboCell     the extracted `muffin` sprite, halved, as the combo bar's cell icon.
 //   comboBar      the extracted `scoreBar` capsule plus the "combo bar" caption lifted out of
 //                 the original `comboBar` symbol (whose baked-in muffins and "not working
 //                 yet :(" line are dropped).
 //
-// The enemy fruit (apple, pear, pomegranate, lime, banana, plum) and the boss are authored
-// artwork kept as PNG files in assets/sprites/; this tool never touches them.
-// Every pixel this tool writes is fully opaque or fully transparent, except the combo bar,
-// which keeps the anti-aliased rim of the capsule it is copied from.
+// Everything else in assets/sprites/ comes straight out of the 2013 SWF and this tool never
+// touches it. Every pixel it writes is fully opaque or fully transparent, except the combo
+// bar, which keeps the anti-aliased rim of the capsule it is copied from.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -225,17 +223,6 @@ function hardenAlpha(img) {
 // Sprites derived straight from the extracted art
 // ---------------------------------------------------------------------------
 
-/** One ball of the extracted cherry, halved: the little berry of the berry-rain event. */
-function makeBerry() {
-  const cherry = readPng(src('cherry_0.png'));
-  // The right-hand ball on its own, in cherry_0.png pixel coordinates. The extracted art
-  // sits on a 2 px grid from an even origin, so halving this 24x24 block is exact.
-  const ball = crop(cherry, 24, 24, 24, 24);
-  const small = hardenAlpha(half(ball));
-  const box = bbox(small);
-  return centre(crop(small, box.x0, box.y0, box.x1 - box.x0 + 1, box.y1 - box.y0 + 1), 12, 12);
-}
-
 /** The muffin, halved, as the combo bar's cell icon. */
 function makeComboCell() {
   const muffin = readPng(src('muffin_0.png'));
@@ -278,7 +265,6 @@ function emit(file, img, harden = true) {
   written.push(`${file}  ${img.width}x${img.height}`);
 }
 
-emit('berry.png', makeBerry());
 emit('comboCell.png', makeComboCell());
 // The capsule is copied pixel for pixel out of `scoreBar`, anti-aliased rim included, so
 // that the three HUD bars stay identical; hardening its alpha would make it the odd one out.

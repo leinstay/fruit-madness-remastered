@@ -1,13 +1,12 @@
-// js/game/director.js — attack/warning cycle, difficulty ramp, double sides, mini-events.
+// js/game/director.js — attack/warning cycle, difficulty ramp, double sides.
 // stepDirector() only reports what should be spawned on the current frame; moving and
 // storing live entities is the world's job.
-import { DIRECTOR, W } from '../config.js';
+import { DIRECTOR } from '../config.js';
 import { MODES, spawnEnemy, PERPENDICULAR_PAIRS } from './modes.js';
 import { createFormation, maxGapShift, FORMATIONS } from './patterns.js';
-import { createEvent, EVENT_NAMES } from './events.js';
 
-// The project's own cast (see the design spec); the first phase always uses the cherry.
-export const FRUITS = ['cherry', 'apple', 'pear', 'pomegranate', 'lime', 'banana', 'plum'];
+// Every enemy is the cherry of the 2013 original.
+export const FRUIT = 'cherry';
 
 const ALL_MODES = [1, 2, 3, 4, 5, 6, 7, 8];
 // Diagonal starting points are sparse, so only the two formations that read well there.
@@ -16,7 +15,7 @@ const DIAGONAL_FORMATIONS = ['random', 'stairs'];
 const LANE_PX = { h: 90, v: 120, d: 90 };
 const START_GAP = 2;
 
-const empty = () => ({ enemies: [], sugars: [], telegraphs: [] });
+const empty = () => ({ enemies: [], sugars: [] });
 
 /** Wave interval: 60 -> 35 frames, linearly over WAVE_INTERVAL_SHIFTS changes. */
 export function waveInterval(shift) {
@@ -30,16 +29,11 @@ export function maxEnemiesFor(shift) {
   return Math.min(4, 3 + Math.floor(shift / 4));
 }
 
-// Build the per-phase state (formations or the event) for the plan that is now current.
+// Build the per-phase state (one formation per stream) for the plan that is now current.
 function armPlan(d) {
   d.interval = waveInterval(d.shift);
   d.offset = Math.floor(d.interval / 2);
   d.streams = [];
-  d.event = null;
-  if (d.plan.type === 'event') {
-    d.event = createEvent(d.plan.event, d.rng, d.difficulty);
-    return;
-  }
   const maxEnemies = d.plan.type === 'double' ? 2 : maxEnemiesFor(d.shift);
   for (const id of d.plan.modes) {
     const axis = MODES[id].axis;
@@ -66,33 +60,25 @@ function spawnWave(d, stream, out) {
 function chooseNextPlan(d) {
   const rng = d.rng;
   const nextShift = d.shift + 1;
-  const current = d.plan.modes ?? [];
+  const current = d.plan.modes;
 
-  if (d.shift - d.lastEventShift >= DIRECTOR.EVENT_MIN_GAP_SHIFTS && rng.chance(DIRECTOR.EVENT_CHANCE)) {
-    return { type: 'event', event: rng.pick(EVENT_NAMES) };
-  }
-
-  const fruit = rng.pick(FRUITS);
   const doubleChance = Math.min(DIRECTOR.DOUBLE_MAX_CHANCE, 0.1 * (nextShift - (DIRECTOR.DOUBLE_FROM_SHIFT - 1)));
   if (nextShift >= DIRECTOR.DOUBLE_FROM_SHIFT && rng.chance(doubleChance)) {
     const sameAsNow = (p) => p.length === current.length && p.every((m) => current.includes(m));
     const pairs = PERPENDICULAR_PAIRS.filter((p) => !sameAsNow(p));
-    return { type: 'double', modes: [...rng.pick(pairs.length ? pairs : PERPENDICULAR_PAIRS)], fruit };
+    return { type: 'double', modes: [...rng.pick(pairs.length ? pairs : PERPENDICULAR_PAIRS)], fruit: FRUIT };
   }
 
   const pool = ALL_MODES.filter((m) => !current.includes(m));
-  return { type: 'single', modes: [rng.pick(pool)], fruit };
+  return { type: 'single', modes: [rng.pick(pool)], fruit: FRUIT };
 }
 
 function toWarning(d) {
   d.phase = 'warning';
   d.timer = 0;
   d.streams = [];
-  d.event = null;
   d.nextPlan = chooseNextPlan(d);
-  d.warnings = d.nextPlan.type === 'event'
-    ? [{ sprite: 'dangerHz', x: W / 2, y: 55 }]
-    : d.nextPlan.modes.map((m) => ({ ...MODES[m].danger }));
+  d.warnings = d.nextPlan.modes.map((m) => ({ ...MODES[m].danger }));
 }
 
 function toAttack(d) {
@@ -103,7 +89,6 @@ function toAttack(d) {
   d.warnings = [];
   d.phase = 'attack';
   d.timer = 0;
-  if (d.plan.type === 'event') d.lastEventShift = d.shift;
   armPlan(d);
 }
 
@@ -114,13 +99,10 @@ export function createDirector(rng, { startShift = 0 } = {}) {
     timer: 0,
     shift: startShift,
     difficulty: DIRECTOR.START_DIFFICULTY + startShift * DIRECTOR.DIFFICULTY_STEP,
-    plan: { type: 'single', modes: [1], fruit: 'cherry' },
+    plan: { type: 'single', modes: [1], fruit: FRUIT },
     nextPlan: null,
     warnings: [],
-    // No event has run yet, so the very first change may already pick one.
-    lastEventShift: startShift - DIRECTOR.EVENT_MIN_GAP_SHIFTS,
     streams: [],
-    event: null,
     interval: waveInterval(startShift),
     offset: 0,
   };
@@ -136,15 +118,6 @@ export function stepDirector(d) {
   if (d.phase === 'warning') {
     if (d.timer >= DIRECTOR.WARNING_FRAMES) toAttack(d);
     return out; // nothing spawns while the DANGER sign is up
-  }
-
-  if (d.plan.type === 'event') {
-    const got = d.event.step(d.timer);
-    out.enemies.push(...got.enemies);
-    out.sugars.push(...got.sugars);
-    out.telegraphs.push(...got.telegraphs);
-    if (d.timer >= DIRECTOR.EVENT_FRAMES) toWarning(d);
-    return out;
   }
 
   // The first wave lands on frame `interval`: the first second stays empty, as in the original.

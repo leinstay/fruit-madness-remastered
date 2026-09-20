@@ -1,7 +1,7 @@
 // HUD and overlay drawing for the game scene: the three capsules along the top, the
-// PAUSE/MENU buttons along the bottom, the DANGER signs and the boss telegraph bands.
+// PAUSE/MENU buttons along the bottom and the DANGER signs.
 // Kept out of game.js so that scene stays about the game loop.
-import { W, H, FUEL, COMBO, ENEMY, SCORE_MAX } from '../config.js';
+import { W, H, FUEL, COMBO, SCORE_MAX } from '../config.js';
 import { drawSprite } from '../core/assets.js';
 import { frameAt } from '../core/anim.js';
 import { drawText } from '../core/text.js';
@@ -16,7 +16,6 @@ export const BTN_PAUSE = { x: 57, y: 425 };
 export const BTN_MENU = { x: 546, y: 425 };
 
 const BLINK_TICKS = 15;                 // 2 Hz at 60 fps: 15 on, 15 off
-const TELEGRAPH_FILL = 'rgba(220, 30, 40, 0.28)';
 
 /** True on the "lit" half of a 2 Hz blink. */
 export const blinkOn = (frame) => Math.floor(frame / BLINK_TICKS) % 2 === 0;
@@ -39,16 +38,6 @@ export const rectHit = (r, p) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y &&
  */
 export function buttonRect(assets, name, pos) {
   return expandRect(spriteRect(assets, name, pos.x, pos.y), MIN_TOUCH_SIZE, MIN_TOUCH_SIZE);
-}
-
-/** Draws `name` scaled by `scale` about its anchor. The only caller left is the
- *  missing-sprite safety net in drawWorldSprites. */
-export function drawScaledSprite(ctx, assets, name, frame, x, y, scale) {
-  if (!assets || !assets.has(name) || scale <= 0) return;
-  const img = assets.img(name, frame);
-  if (!img || !img.width) return;
-  const a = assets.anchor(name) || [img.width / 2, img.height / 2];
-  ctx.drawImage(img, x - a[0] * scale, y - a[1] * scale, img.width * scale, img.height * scale);
 }
 
 function drawFuel(ctx, assets, fuelValue) {
@@ -103,22 +92,19 @@ function drawCombo(ctx, assets, combo) {
  * The live contents of the field — the muffins and the enemies — without the player, the
  * HUD or the buttons. Shared by the game scene and by the game-over screen, which keeps
  * the same world stepping and drawing behind its UI, as the original does.
- * Every enemy the director and the events can emit now has its own sprite; an enemy whose
- * sprite is somehow absent from the manifest still falls back to a cherry scaled to its
- * size rather than vanishing.
+ * An enemy whose sprite is somehow absent from the manifest still falls back to the
+ * cherry rather than vanishing.
  */
 export function drawWorldSprites(ctx, assets, world) {
   const muffinFrame = frameAt(assets.timing('muffin'), assets.frameCount('muffin'), world.frame);
   for (const s of world.sugars) drawSprite(ctx, assets, 'muffin', muffinFrame, s.x, s.y);
   for (const e of world.enemies) {
-    const known = assets.has(e.sprite);
-    const name = known ? e.sprite : 'cherry';
+    const name = assets.has(e.sprite) ? e.sprite : 'cherry';
     if (!assets.has(name)) continue;
     // The per-enemy animOffset was drawn from the world's rng at spawn time, so the wave
     // does not animate in lockstep and drawing consumes no randomness of its own.
     const f = frameAt(assets.timing(name), assets.frameCount(name), world.frame + (e.animOffset | 0));
-    if (known) drawSprite(ctx, assets, name, f, e.x, e.y);
-    else drawScaledSprite(ctx, assets, name, f, e.x, e.y, (e.size || ENEMY.SIZE) / ENEMY.SIZE);
+    drawSprite(ctx, assets, name, f, e.x, e.y);
   }
 }
 
@@ -140,15 +126,6 @@ export function drawWarnings(ctx, assets, warnings, frame) {
     const f = frameAt(assets.timing(wn.sprite), assets.frameCount(wn.sprite), frame);
     drawSprite(ctx, assets, wn.sprite, f, wn.x, wn.y);
   }
-}
-
-/** The boss telegraph: a translucent red full-width band, blinking at the same 2 Hz. */
-export function drawTelegraphs(ctx, telegraphs, frame) {
-  if (!telegraphs || telegraphs.length === 0 || !blinkOn(frame)) return;
-  ctx.save();
-  ctx.fillStyle = TELEGRAPH_FILL;
-  for (const t of telegraphs) ctx.fillRect(t.x, t.y, t.w, t.h);
-  ctx.restore();
 }
 
 export function drawPaused(ctx) {

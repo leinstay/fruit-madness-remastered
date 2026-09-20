@@ -1,14 +1,16 @@
 // tests/manifest.test.js — the asset manifest is the contract between the game logic,
 // which only ever names a sprite, and the files on disk. These checks are filesystem-only
-// (no DOM, no canvas) and catch the failure the loader cannot: a name the director or an
-// event can emit that nothing in assets/ answers to.
+// (no DOM, no canvas) and catch the failure the loader cannot: a name the director can
+// emit that nothing in assets/ answers to.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { FRUITS } from '../js/game/director.js';
+import { ENEMY } from '../js/config.js';
+import { FRUIT } from '../js/game/director.js';
+import { MODES } from '../js/game/modes.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets', 'manifest.json'), 'utf8'));
@@ -63,14 +65,12 @@ test('every animated sprite has timing for exactly its frames', () => {
 });
 
 test('every sprite the game logic can name is in the manifest', () => {
-  // The fruit the director hands to each attack wave.
-  for (const fruit of FRUITS) assert.ok(fruit in sprites, `director can emit '${fruit}'`);
-  // The events name their sprites as literals; read them out of the source so a new event
-  // cannot quietly introduce a sprite that does not exist.
-  const events = fs.readFileSync(path.join(ROOT, 'js', 'game', 'events.js'), 'utf8');
-  const named = [...events.matchAll(/sprite:\s*'([A-Za-z0-9_]+)'/g)].map((m) => m[1]);
-  assert.ok(named.includes('berry') && named.includes('boss'), 'events still spawn berry and boss');
-  for (const name of new Set(named)) assert.ok(name in sprites, `events can emit '${name}'`);
+  // The one fruit the director hands to every attack wave.
+  assert.ok(FRUIT in sprites, `director can emit '${FRUIT}'`);
+  // The DANGER sign each of the eight attack modes announces itself with.
+  for (const [id, mode] of Object.entries(MODES)) {
+    assert.ok(mode.danger.sprite in sprites, `mode ${id} warns with '${mode.danger.sprite}'`);
+  }
   // And the HUD pieces the combo bar is assembled from.
   for (const name of ['comboBar', 'comboCell']) assert.ok(name in sprites, `HUD needs '${name}'`);
 });
@@ -85,28 +85,13 @@ test('every sprite file is a readable 8-bit PNG', () => {
   }
 });
 
-test('the fruit enemies are the same size as the cherry they join', () => {
-  const cherry = pngHeader(path.join(ROOT, filesOf(sprites.cherry)[0]));
-  for (const fruit of FRUITS) {
-    for (const rel of filesOf(sprites[fruit])) {
-      const h = pngHeader(path.join(ROOT, rel));
-      // A wave mixes fruit freely, so they must all read at one scale. Half a cherry to
-      // one and a half is as far apart as they may drift.
-      assert.ok(h.width >= cherry.width * 0.5 && h.width <= cherry.width * 1.5, `${rel}: width ${h.width} vs cherry ${cherry.width}`);
-      assert.ok(h.height >= cherry.height * 0.5 && h.height <= cherry.height * 1.5, `${rel}: height ${h.height} vs cherry ${cherry.height}`);
-    }
-  }
-});
-
-test('the event sprites are the size their hit radius implies', () => {
-  // berry ~12x12 around ENEMY.BERRY_R = 5, boss ~120x120 around ENEMY.BOSS_R = 60.
-  const berry = pngHeader(path.join(ROOT, filesOf(sprites.berry)[0]));
-  assert.ok(berry.width >= 8 && berry.width <= 16, `berry width ${berry.width}`);
-  assert.ok(berry.height >= 8 && berry.height <= 16, `berry height ${berry.height}`);
-  for (const rel of filesOf(sprites.boss)) {
+test('the cherry is the size its hit radius implies', () => {
+  // ENEMY.SIZE = 30 around a hit radius of 13; the extracted art is a 46x46 frame whose
+  // anchor puts the fruit on the lane centre.
+  for (const rel of filesOf(sprites.cherry)) {
     const h = pngHeader(path.join(ROOT, rel));
-    assert.ok(h.width >= 100 && h.width <= 140, `${rel}: width ${h.width}`);
-    assert.ok(h.height >= 100 && h.height <= 140, `${rel}: height ${h.height}`);
+    assert.ok(h.width >= ENEMY.SIZE && h.width <= 2 * ENEMY.SIZE, `${rel}: width ${h.width}`);
+    assert.ok(h.height >= ENEMY.SIZE && h.height <= 2 * ENEMY.SIZE, `${rel}: height ${h.height}`);
   }
 });
 

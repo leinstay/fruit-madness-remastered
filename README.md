@@ -36,16 +36,16 @@ in plain JavaScript with no plugin, no build step and no dependencies.
   (up to ×5). A full bar pays a flat 500-point bonus for every further muffin. Let one muffin fly off the
   screen and the bar resets to zero.
 - **DANGER.** Attacks come in cycles: 15 seconds of one attack, then a 5-second warning that flashes on the
-  edge the next wave will come from. Later on two perpendicular sides can attack at once, and every few
-  cycles a regular attack is replaced by a mini-event — a berry rain, a muffin shower or a boss flyby.
+  edge the next wave will come from. Waves come faster and faster, and later on two perpendicular sides can
+  attack at once.
 - **Leaderboard.** After a crash, enter a nickname of 3–6 latin letters or digits to put your score on the
   online top-10 table.
 
 ## Features
 
-- Original pixel art and music from the 2013 game, plus new sprites drawn in the same style.
+- Original pixel art and music from the 2013 game.
 - Attack formations that are always dodgeable — never a wall you could not have slipped through.
-- Eight attack directions, double-sided attacks and three mini-events.
+- Eight attack directions and double-sided attacks that come in from two edges at once.
 - Fuel, a four-cell combo multiplier and a seven-digit score.
 - Online top-10 leaderboard.
 - Keyboard on desktop, floating touch joystick on mobile.
@@ -65,7 +65,7 @@ browsers refuse to load over `file://`.
 ### Tests
 
 ```bash
-node --test tests/          # 129 tests, about 45 seconds
+node --test tests/          # 124 tests, about 90 seconds
 ```
 
 The long survivability proof is opt-in, because it is slow:

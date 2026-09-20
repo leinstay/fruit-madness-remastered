@@ -1,6 +1,7 @@
 // tests/director.test.js
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { ENEMY } from '../js/config.js';
 import { createRng } from '../js/core/rng.js';
 import { createDirector, stepDirector, waveInterval } from '../js/game/director.js';
 
@@ -36,6 +37,32 @@ test('single plans never repeat the previous mode; doubles are perpendicular; no
           const [a, b] = d.plan.modes; assert.ok(a <= 2 && b >= 3 && b <= 4);
         }
         prev = d.plan;
+      }
+    }
+  }
+});
+test('every plan is a plain attack with the original cherry', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const d = createDirector(createRng(seed)); let prev = null;
+    for (let f = 0; f < 1200 * 15; f++) {
+      stepDirector(d);
+      if (d.plan !== prev) {
+        assert.notEqual(d.plan.type, 'event', `seed ${seed}: an event plan at shift ${d.shift}`);
+        assert.equal(d.plan.fruit, 'cherry', `seed ${seed}: fruit at shift ${d.shift}`);
+        assert.ok(Array.isArray(d.plan.modes) && d.plan.modes.length >= 1);
+        prev = d.plan;
+      }
+    }
+  }
+});
+test('every spawned enemy is a cherry of the standard size', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const d = createDirector(createRng(seed));
+    for (let f = 0; f < 1200 * 15; f++) {
+      for (const e of stepDirector(d).enemies) {
+        assert.equal(e.sprite, 'cherry');
+        assert.equal(e.size, ENEMY.SIZE);
+        assert.equal(e.r, ENEMY.HIT_R);
       }
     }
   }

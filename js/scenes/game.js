@@ -12,7 +12,7 @@ import { hitsAny, collectSugars } from '../game/collision.js';
 import { createStarfield } from './starfield.js';
 import { createExplosion } from './explosion.js';
 import {
-  drawHud, drawButtons, drawWarnings, drawTelegraphs, drawPaused, drawWorldSprites,
+  drawHud, drawButtons, drawWarnings, drawPaused, drawWorldSprites,
   buttonRect, rectHit, BTN_PAUSE, BTN_MENU,
 } from './game-hud.js';
 import { drawJoystick } from './joystick-view.js';
@@ -118,8 +118,6 @@ export function createGameScene() {
     c.fillRect(0, 0, W, H);
     drawSprite(c, assets, 'background', 0, 0, 0);
     starfield.render(c, assets);
-
-    drawTelegraphs(c, world.telegraphs, world.frame);
 
     drawWorldSprites(c, assets, world);
 

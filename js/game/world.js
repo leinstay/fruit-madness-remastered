@@ -15,14 +15,8 @@ export function createWorld(seed, { startShift = 0 } = {}) {
     director: createDirector(rng, { startShift }),
     enemies: [],
     sugars: [],
-    telegraphs: [],
     warnings: [],
   };
-}
-
-/** True while the muffin shower event is running — it supplies the muffins itself. */
-function inMuffinShower(d) {
-  return d.phase === 'attack' && d.plan.type === 'event' && d.plan.event === 'muffinShower';
 }
 
 /** Advance one 60 Hz frame. Returns how many muffins left the field uncollected. */
@@ -32,12 +26,9 @@ export function stepWorld(w) {
   const spawned = stepDirector(w.director);
   w.enemies.push(...spawned.enemies);
   w.sugars.push(...spawned.sugars);
-  w.telegraphs = spawned.telegraphs;
   w.warnings = w.director.warnings;
 
-  if (w.frame % SUGAR.INTERVAL === 0 && !inMuffinShower(w.director)) {
-    w.sugars.push(...spawnSugarWave(w.rng));
-  }
+  if (w.frame % SUGAR.INTERVAL === 0) w.sugars.push(...spawnSugarWave(w.rng));
 
   for (let i = w.enemies.length - 1; i >= 0; i--) {
     const e = w.enemies[i];
