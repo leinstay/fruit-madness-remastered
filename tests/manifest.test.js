@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { ENEMY } from '../js/config.js';
 import { FRUIT } from '../js/game/director.js';
 import { MODES } from '../js/game/modes.js';
+import { layeredEntry } from '../js/core/assets.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets', 'manifest.json'), 'utf8'));
@@ -24,6 +25,13 @@ function filesOf(entry) {
   if (entry.file) return [entry.file];
   return [];
 }
+
+/**
+ * A `layered` vector is one file holding every frame at once, so it plays by its own
+ * rules: its viewport is the field rather than a symbol's box, and its frame count is a
+ * number in the entry instead of a list of files.
+ */
+const layeredOf = (entry) => (typeof entry === 'object' ? layeredEntry(entry) : null);
 
 const PNG_MAGIC = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
@@ -110,6 +118,7 @@ const attrOf = (tag, name) => {
 
 test('every vector file exists and declares the viewport the manifest states', () => {
   for (const [name, entry] of Object.entries(vectors)) {
+    if (layeredOf(entry)) continue;   // checked on its own terms below
     const files = filesOf(entry);
     assert.ok(files.length > 0, `vectors.${name} names no file`);
     assert.ok(Array.isArray(entry.size) && entry.size.length === 2, `vectors.${name}: needs a size`);
@@ -139,7 +148,7 @@ test('every vector entry pins its registration point inside the frame', () => {
     const [w, h] = entry.size;
     assert.ok(x >= 0 && x <= w, `vectors.${name}: anchor x ${x} outside 0..${w}`);
     assert.ok(y >= 0 && y <= h, `vectors.${name}: anchor y ${y} outside 0..${h}`);
-    if (Array.isArray(entry.durations)) {
+    if (Array.isArray(entry.durations) && !layeredOf(entry)) {
       assert.equal(entry.durations.length, entry.frames.length, `vectors.${name}: durations do not match frames`);
     }
   }
@@ -151,10 +160,36 @@ test('every vector mirrors the sprite of the same name, frame for frame', () => 
   for (const [name, entry] of Object.entries(vectors)) {
     assert.ok(name in sprites, `vectors.${name} has no sprite to replace`);
     const sprite = sprites[name];
-    assert.equal(filesOf(entry).length, filesOf(sprite).length, `vectors.${name}: frame count differs from the sprite`);
+    const layered = layeredOf(entry);
+    const count = layered ? layered.frameCount : filesOf(entry).length;
+    assert.equal(count, filesOf(sprite).length, `vectors.${name}: frame count differs from the sprite`);
     assert.equal(entry.fps ?? null, sprite.fps ?? null, `vectors.${name}: fps differs from the sprite`);
     assert.deepEqual(entry.durations ?? null, sprite.durations ?? null, `vectors.${name}: durations differ from the sprite`);
   }
+});
+
+test('the layered title vector agrees with the file it names', () => {
+  const layered = layeredOf(vectors.titleBg);
+  assert.ok(layered, 'vectors.titleBg must be a layered entry');
+  assert.deepEqual(layered.size, [600, 450], 'the title covers the whole field');
+  assert.deepEqual(layered.anchor, [0, 0], 'it is drawn from the top-left corner');
+
+  const text = fs.readFileSync(path.join(ROOT, layered.file), 'utf8');
+  const markers = [...text.matchAll(/<!--frame:\d+-->/g)].length;
+  assert.equal(layered.frameCount, markers, 'frameCount must match the markers in the file');
+
+  // One turn of the title animation is 40 ticks, two thirds of a second, exactly as the
+  // 2013 timeline recorded it.
+  assert.equal(layered.durations.length, layered.frameCount, 'one duration per frame');
+  assert.equal(layered.durations.reduce((a, b) => a + b, 0), 40, 'the loop is 40 ticks');
+
+  // The viewport is the field; unlike the per-symbol vectors it does not start at the
+  // origin, because it is the visible window onto a much larger drawing.
+  const root = text.slice(0, text.indexOf('>') + 1);
+  assert.equal(attrOf(root, 'width'), '600');
+  assert.equal(attrOf(root, 'height'), '450');
+  const box = attrOf(root, 'viewBox').trim().split(/[\s,]+/).map(Number);
+  assert.deepEqual([box[2], box[3]], layered.size, 'the viewBox is the size the manifest states');
 });
 
 test('the vector files carry nothing but drawable SVG', () => {

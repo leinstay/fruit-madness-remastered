@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSpriteEntry, spriteSource, rasterFrameSize, isCacheable } from '../js/core/assets.js';
+import { normalizeSpriteEntry, spriteSource, rasterFrameSize, isCacheable, layeredEntry } from '../js/core/assets.js';
 
 test('string form: a single frame, no timing, centre anchor', () => {
   assert.deepEqual(normalizeSpriteEntry('assets/sprites/star.png'),
@@ -114,6 +114,7 @@ test('the cache of every vector frame stays a few megabytes', async () => {
   const bytesAt = (scale) => {
     let total = 0;
     for (const entry of Object.values(manifest.vectors)) {
+      if (layeredEntry(entry)) continue;   // never cached whole; see title-frames.test.js
       const v = normalizeSpriteEntry(entry);
       if (!isCacheable(v.size)) continue;
       const [w, h] = rasterFrameSize(v.size, scale);
@@ -145,10 +146,42 @@ test('the real manifest normalizes: every entry has at least one frame', async (
   assert.equal(normalizeSpriteEntry(manifest.sprites.ufo).timing, 12);
 });
 
+// --- the layered form: one file, every frame -----------------------------------------
+test('a layered entry states its file, its frame count and its timing', () => {
+  assert.deepEqual(
+    layeredEntry({
+      file: 'assets/sprites/titleBg.svg',
+      layered: true,
+      frameCount: 3,
+      durations: [3, 1, 2],
+      anchor: [0, 0],
+      size: [600, 450],
+    }),
+    { file: 'assets/sprites/titleBg.svg', frameCount: 3, durations: [3, 1, 2], size: [600, 450], anchor: [0, 0] });
+});
+
+test('only an entry that says so is layered', () => {
+  assert.equal(layeredEntry({ file: 'a.svg', size: [1, 1], anchor: [0, 0] }), null);
+  assert.equal(layeredEntry('a.svg'), null);
+  assert.equal(layeredEntry(null), null);
+});
+
+test('a layered entry that cannot be trusted is rejected, not guessed at', () => {
+  const good = { file: 'a.svg', layered: true, frameCount: 2, durations: [1, 1], size: [600, 450] };
+  assert.equal(layeredEntry(good).anchor.join(), '0,0', 'the anchor defaults to the top-left');
+  assert.throws(() => layeredEntry({ ...good, file: '' }), /file/);
+  assert.throws(() => layeredEntry({ ...good, frameCount: 0 }), /frameCount/);
+  assert.throws(() => layeredEntry({ ...good, frameCount: 2.5 }), /frameCount/);
+  assert.throws(() => layeredEntry({ ...good, durations: [1] }), /durations/);
+  assert.throws(() => layeredEntry({ ...good, size: [0, 450] }), /size/);
+  assert.throws(() => layeredEntry({ ...good, size: undefined }), /size/);
+});
+
 test('the vectors map normalizes: a size and an anchor on every entry', async () => {
   const manifest = await readManifest();
   assert.ok(manifest.vectors && Object.keys(manifest.vectors).length > 0, 'the manifest declares no vectors');
   for (const [name, entry] of Object.entries(manifest.vectors)) {
+    if (layeredEntry(entry)) continue;     // a form of its own, checked above
     const v = normalizeSpriteEntry(entry);
     assert.ok(v.frames.length >= 1, `vectors.${name} has no frames`);
     assert.ok(Array.isArray(v.size) && v.size.every((n) => n > 0), `vectors.${name} has no size`);

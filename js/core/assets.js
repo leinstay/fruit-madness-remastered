@@ -13,6 +13,10 @@
 // so the image centre is no longer a safe default and `anchor` is always spelled out),
 // `notext` names a variant of the file with the baked-in caption removed, and `textOnly`
 // marks a symbol that is nothing but its caption and has no artwork to draw at all.
+//
+// A fifth form, `layered`, is one file holding every frame of an animation at once (the
+// title screen). It is too big to hold as bitmaps and is not blitted like a sprite, so the
+// loader only hands the entry over — js/core/title-frames.js does the rest.
 import { W, H } from '../config.js';
 import { deviceScale, snapToDevice } from './canvas.js';
 
@@ -48,6 +52,34 @@ export function normalizeSpriteEntry(entry) {
     return { frames: [entry.file], timing: null, anchor, size, notext, textOnly };
   }
   throw new Error(`normalizeSpriteEntry: entry has neither "frames" nor "file": ${JSON.stringify(entry)}`);
+}
+
+/**
+ * A `layered` vector entry -> { file, frameCount, durations, size, anchor }, or null when
+ * the entry is not one. One SVG file carries every frame of the animation; `frameCount`
+ * says how many it holds and `durations` are the 60 Hz holds, one per frame, exactly as
+ * on the sprite it mirrors. Pure, so the manifest test can check the entry against the
+ * file without a browser.
+ */
+export function layeredEntry(entry) {
+  if (!entry || typeof entry !== 'object' || entry.layered !== true) return null;
+  if (typeof entry.file !== 'string' || entry.file === '') {
+    throw new Error('layeredEntry: a layered entry needs a "file"');
+  }
+  const frameCount = Number(entry.frameCount);
+  if (!Number.isInteger(frameCount) || frameCount < 1) {
+    throw new Error(`layeredEntry: ${entry.file} needs a positive integer "frameCount"`);
+  }
+  const durations = Array.isArray(entry.durations) ? entry.durations.map(Number) : null;
+  if (durations && durations.length !== frameCount) {
+    throw new Error(`layeredEntry: ${entry.file} has ${durations.length} durations for ${frameCount} frames`);
+  }
+  const pair = (value) => (Array.isArray(value) && value.length === 2 ? [Number(value[0]), Number(value[1])] : null);
+  const size = pair(entry.size);
+  if (!size || !(size[0] > 0) || !(size[1] > 0)) {
+    throw new Error(`layeredEntry: ${entry.file} needs a positive "size"`);
+  }
+  return { file: entry.file, frameCount, durations, size, anchor: pair(entry.anchor) || [0, 0] };
 }
 
 /**
@@ -139,9 +171,12 @@ export async function loadAssets(manifestUrl) {
   }
 
   const vectors = new Map();
+  const layers = new Map();
   for (const [name, entry] of Object.entries(manifest.vectors || {})) {
     try {
-      vectors.set(name, normalizeSpriteEntry(entry));
+      const layered = layeredEntry(entry);
+      if (layered) layers.set(name, layered);
+      else vectors.set(name, normalizeSpriteEntry(entry));
     } catch (err) {
       console.warn(`assets: skipping vector "${name}":`, err);
     }
@@ -159,6 +194,9 @@ export async function loadAssets(manifestUrl) {
       continue;
     }
     specs.set(name, spec);
+    // A layered symbol is drawn from its one SVG file. Its raster frames are the fallback
+    // and are only fetched if that ever fails, so nothing of them is downloaded normally.
+    if (layers.has(name)) continue;
     const source = spriteSource(spec, vectors.get(name) || null);
     if (source.kind === 'none') continue;   // drawn as text, nothing to fetch
     const record = {
@@ -269,7 +307,7 @@ export async function loadAssets(manifestUrl) {
   const size = (name) => {
     const record = sprites.get(name);
     if (!record) {
-      const spec = vectors.get(name);
+      const spec = vectors.get(name) || layers.get(name);
       return spec && spec.size ? spec.size.slice() : null;
     }
     if (record.size) return record.size.slice();
@@ -283,14 +321,47 @@ export async function loadAssets(manifestUrl) {
     const record = sprites.get(name);
     if (record && record.anchor) return record.anchor;
     if (!record) {
-      const spec = vectors.get(name);
+      const spec = vectors.get(name) || layers.get(name);
       if (spec && spec.anchor) return spec.anchor;
     }
     const wh = size(name);
     return wh ? [wh[0] / 2, wh[1] / 2] : null;
   };
 
-  return { img, frame, has, size, frameCount, timing, anchor, rasterise, vectors, manifest };
+  /** The layered vector entry of a symbol, or null — see js/core/title-frames.js. */
+  const layered = (name) => layers.get(name) || null;
+
+  /**
+   * Loads the 2013 raster frames of a symbol that was skipped because it is drawn from a
+   * layered vector. This is the fallback for a vector that could not be fetched or
+   * decoded, and is why those frames are not downloaded in the normal case. Resolves to
+   * whether the symbol can be drawn afterwards; calling it twice is harmless.
+   */
+  async function loadRasterFrames(name) {
+    if (sprites.has(name)) return true;
+    const spec = specs.get(name);
+    if (!spec) return false;
+    const images = await Promise.all(spec.frames.map(loadImage));
+    const usable = images.filter(Boolean);
+    if (usable.length === 0) {
+      console.warn(`assets: "${name}" has no usable raster frames either`);
+      return false;
+    }
+    sprites.set(name, {
+      kind: 'raster',
+      images: usable,
+      bitmaps: null,
+      timing: Array.isArray(spec.timing) && spec.timing.length !== usable.length ? null : spec.timing,
+      anchor: spec.anchor,
+      size: null,
+    });
+    return true;
+  }
+
+  return {
+    img, frame, has, size, frameCount, timing, anchor, rasterise,
+    layered, loadRasterFrames, vectors, manifest,
+  };
 }
 
 // Draws one frame so that the sprite's anchor (its centre when there is no anchor)
