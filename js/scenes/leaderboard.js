@@ -37,10 +37,13 @@ export function createLeaderboardScene() {
     );
   }
 
-  /** The run that was just submitted: the same name and, when it is known, the same score. */
+  /**
+   * The row of the player who has just submitted. The table lists a player once, with their
+   * best score, so the row is theirs whether or not this run was the best one.
+   */
   function isMine(row) {
-    if (!highlight || row.name !== highlight.name) return false;
-    return !Number.isFinite(highlight.score) || row.score === Math.floor(highlight.score);
+    if (!highlight || typeof highlight.name !== 'string') return false;
+    return row.name === highlight.name.toUpperCase();
   }
 
   function update(input) {
