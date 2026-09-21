@@ -10,8 +10,21 @@ test('topTen sorts by score descending', () => {
     { name: 'b', score: 300 },
     { name: 'c', score: 50 },
   ]);
-  assert.deepEqual(names(rows), ['b', 'c', 'a']);
-  assert.deepEqual(rows[0], { name: 'b', score: 300 });
+  assert.deepEqual(names(rows), ['B', 'C', 'A']);
+  assert.deepEqual(rows[0], { name: 'B', score: 300 });
+});
+
+test('topTen shows every name in capitals without touching the order', () => {
+  const rows = topTen([
+    { name: 'bob', score: 10 },
+    { name: 'Lein', score: 300 },
+    { name: 'poTATo', score: 50 },
+  ]);
+  assert.deepEqual(rows, [
+    { name: 'LEIN', score: 300 },
+    { name: 'POTATO', score: 50 },
+    { name: 'BOB', score: 10 },
+  ]);
 });
 
 test('topTen keeps the earlier entry first on a tie', () => {
@@ -20,7 +33,7 @@ test('topTen keeps the earlier entry first on a tie', () => {
     { name: 'second', score: 100 },
     { name: 'third', score: 100 },
   ]);
-  assert.deepEqual(names(rows), ['first', 'second', 'third']);
+  assert.deepEqual(names(rows), ['FIRST', 'SECOND', 'THIRD']);
 });
 
 test('topTen trims to ten rows', () => {
@@ -28,7 +41,7 @@ test('topTen trims to ten rows', () => {
   for (let i = 0; i < 25; i++) src.push({ name: `n${i}`, score: i });
   const rows = topTen(src);
   assert.equal(rows.length, 10);
-  assert.deepEqual(names(rows), ['n24', 'n23', 'n22', 'n21', 'n20', 'n19', 'n18', 'n17', 'n16', 'n15']);
+  assert.deepEqual(names(rows), ['N24', 'N23', 'N22', 'N21', 'N20', 'N19', 'N18', 'N17', 'N16', 'N15']);
 });
 
 test('topTen is pure: it does not reorder its input', () => {
@@ -47,7 +60,7 @@ test('topTen skips junk entries and normalizes the rows', () => {
     { name: 'nan', score: Number.NaN },
     { name: 'floaty', score: 7.9 },
   ]);
-  assert.deepEqual(rows, [{ name: 'floaty', score: 7 }, { name: 'ok', score: 5 }]);
+  assert.deepEqual(rows, [{ name: 'FLOATY', score: 7 }, { name: 'OK', score: 5 }]);
 });
 
 test('topTen tolerates a missing list', () => {
@@ -106,7 +119,7 @@ test('a failed backend load is retried, not cached', async () => {
   });
   await assert.rejects(lb.fetchTop10(), (e) => e.message === 'offline');
   await assert.rejects(lb.fetchTop10(), (e) => e.message === 'offline');
-  assert.deepEqual(await lb.fetchTop10(), [{ name: 'Late', score: 7 }]);
+  assert.deepEqual(await lb.fetchTop10(), [{ name: 'LATE', score: 7 }]);
   assert.equal(attempts, 3);
 });
 
@@ -132,7 +145,15 @@ test('submitScore writes the trimmed name and a floored score', async () => {
   const { loadBackend, calls } = fakeBackend();
   const lb = createLeaderboard({ loadBackend });
   await lb.submitScore('  Lein  ', 2601.9);
-  assert.deepEqual(calls.add, [{ name: 'Lein', score: 2601 }]);
+  assert.deepEqual(calls.add, [{ name: 'LEIN', score: 2601 }]);
+});
+
+test('submitScore sends the name in capitals', async () => {
+  const { loadBackend, calls } = fakeBackend();
+  const lb = createLeaderboard({ loadBackend, cooldownMs: 0 });
+  await lb.submitScore('bob', 10);
+  await lb.submitScore('poTATo', 20);
+  assert.deepEqual(calls.add, [{ name: 'BOB', score: 10 }, { name: 'POTATO', score: 20 }]);
 });
 
 test('submitScore validates before touching the network', async () => {
@@ -152,7 +173,7 @@ test('submitScore accepts the score range boundaries', async () => {
   const lb = createLeaderboard({ loadBackend, cooldownMs: 0 });
   await lb.submitScore('Lein', 1);
   await lb.submitScore('Lein', 9_999_999);
-  assert.deepEqual(calls.add, [{ name: 'Lein', score: 1 }, { name: 'Lein', score: 9_999_999 }]);
+  assert.deepEqual(calls.add, [{ name: 'LEIN', score: 1 }, { name: 'LEIN', score: 9_999_999 }]);
 });
 
 test('a second submit inside 10 seconds is a cooldown, and nothing is sent', async () => {
@@ -165,7 +186,7 @@ test('a second submit inside 10 seconds is a cooldown, and nothing is sent', asy
   assert.equal(calls.add.length, 1);
   clock += 1;
   await lb.submitScore('Lein', 200);
-  assert.deepEqual(calls.add, [{ name: 'Lein', score: 100 }, { name: 'Lein', score: 200 }]);
+  assert.deepEqual(calls.add, [{ name: 'LEIN', score: 100 }, { name: 'LEIN', score: 200 }]);
 });
 
 test('the cooldown clock only starts after a write that succeeded', async () => {
@@ -182,7 +203,7 @@ test('the cooldown clock only starts after a write that succeeded', async () => 
   await assert.rejects(lb.submitScore('Lein', 100), (e) => e.message === 'offline');
   fail = false;
   await lb.submitScore('Lein', 100);            // a retry straight away must go through
-  assert.deepEqual(calls, [{ name: 'Lein', score: 100 }]);
+  assert.deepEqual(calls, [{ name: 'LEIN', score: 100 }]);
 });
 
 test('isOnline follows the config and navigator.onLine', async () => {

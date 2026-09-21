@@ -29,13 +29,19 @@ const TIMEOUT_MS = 8_000;       // a hanging request must show OFFLINE, not LOAD
  * descending keeping the earlier entry first on a tie, and trims to ten. Firestore already
  * returns the rows ordered and limited; running them through this keeps the table sane even
  * if a stray document ever slips past the rules.
+ *
+ * Every name is upper-cased here, the one place a row is normalised for display, so the
+ * table reads like an arcade cabinet's — including the rows that were written in lower case
+ * before `validateNick` started capitalising, which the create-only rules make unrewritable.
+ * `toUpperCase` is locale-independent and the names are ASCII, so nothing else moves: the
+ * sort and the tie-break still see the same scores in the same order.
  */
 export function topTen(entries, limit = LIMIT) {
   if (!Array.isArray(entries)) return [];
   const clean = [];
   for (const e of entries) {
     if (!e || typeof e !== 'object') continue;
-    const name = typeof e.name === 'string' ? e.name : '';
+    const name = typeof e.name === 'string' ? e.name.toUpperCase() : '';
     const score = Math.floor(Number(e.score));
     if (!name || !Number.isFinite(score)) continue;
     clean.push({ name, score, order: clean.length });

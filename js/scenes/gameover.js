@@ -31,7 +31,9 @@ const ERROR_TEXT = {
 
 function readNick() {
   try {
-    return (globalThis.localStorage && globalThis.localStorage.getItem(NICK_KEY)) || '';
+    const stored = (globalThis.localStorage && globalThis.localStorage.getItem(NICK_KEY)) || '';
+    // A nickname remembered before the field went all-caps comes back capitalised too.
+    return stored.toUpperCase();
   } catch {
     return '';
   }
@@ -67,6 +69,29 @@ export function createGameOverScene() {
     if (submitBtn) submitBtn.disabled = !on;
   }
 
+  /**
+   * The field behaves like an arcade name entry: what is typed turns into capitals as it is
+   * typed. A CSS `text-transform` would only paint it that way and leave the real value in
+   * lower case, so the value itself is rewritten and the caret is put back where it was —
+   * typing in the middle of a name must not throw it to the end. A composition in progress
+   * (an IME, a phone's word suggestion) is left alone until it commits; the `input` event
+   * that follows the commit does the capitalising.
+   */
+  function onInput(event) {
+    if (!input || (event && event.isComposing)) return;
+    const typed = input.value;
+    const upper = typed.toUpperCase();
+    if (upper === typed) return;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    input.value = upper;
+    // ASCII casing never changes the length. Anything exotic that does simply keeps the
+    // caret where assigning the value left it, at the end.
+    if (upper.length === typed.length && start !== null) {
+      try { input.setSelectionRange(start, end); } catch { /* no caret to restore */ }
+    }
+  }
+
   async function onSubmit(event) {
     if (event && event.preventDefault) event.preventDefault();
     if (submitted || busy) return;
@@ -96,13 +121,14 @@ export function createGameOverScene() {
     setEnabled(true);
     showError('');
     form.addEventListener('submit', onSubmit);
+    if (input) input.addEventListener('input', onInput);
   }
 
   function hideForm() {
     if (!form) return;
     form.hidden = true;
     form.removeEventListener('submit', onSubmit);
-    if (input) input.blur();
+    if (input) { input.removeEventListener('input', onInput); input.blur(); }
   }
 
   function update(inputState) {
