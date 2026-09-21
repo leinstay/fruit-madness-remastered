@@ -63,6 +63,54 @@ test('topTen skips junk entries and normalizes the rows', () => {
   assert.deepEqual(rows, [{ name: 'FLOATY', score: 7 }, { name: 'OK', score: 5 }]);
 });
 
+// The collection keeps every score ever sent and nothing can be deleted from the client, so
+// one player owns several rows. The table shows each of them once, with their best run.
+
+test('topTen keeps one row per name, the best score', () => {
+  const rows = topTen([
+    { name: 'LEIN', score: 50707 },
+    { name: 'BOB', score: 100000 },
+    { name: 'LEIN', score: 23251 },
+    { name: 'LEIN', score: 90000 },
+  ]);
+  assert.deepEqual(rows, [{ name: 'BOB', score: 100000 }, { name: 'LEIN', score: 90000 }]);
+});
+
+test('topTen treats the same name in any case as one player', () => {
+  const rows = topTen([
+    { name: 'lein', score: 10 },
+    { name: 'LeIn', score: 700 },
+    { name: 'LEIN', score: 300 },
+    { name: 'bob', score: 500 },
+  ]);
+  assert.deepEqual(rows, [{ name: 'LEIN', score: 700 }, { name: 'BOB', score: 500 }]);
+});
+
+test('topTen fills ten rows out of more unique names, and fewer when there are fewer', () => {
+  const many = [];
+  for (let i = 0; i < 14; i++) many.push({ name: `P${i}`, score: 100 + i });
+  const rows = topTen(many);
+  assert.equal(rows.length, 10);
+  assert.deepEqual(names(rows), ['P13', 'P12', 'P11', 'P10', 'P9', 'P8', 'P7', 'P6', 'P5', 'P4']);
+
+  // Thirty rows, three players: three rows out, each with that player's best score.
+  const few = [];
+  for (let i = 0; i < 30; i++) few.push({ name: ['ann', 'bob', 'cid'][i % 3], score: i });
+  assert.deepEqual(topTen(few), [
+    { name: 'CID', score: 29 }, { name: 'BOB', score: 28 }, { name: 'ANN', score: 27 },
+  ]);
+});
+
+test('topTen keeps the earlier player first when two best scores tie', () => {
+  const rows = topTen([
+    { name: 'first', score: 10 },
+    { name: 'second', score: 100 },
+    { name: 'first', score: 100 },
+    { name: 'third', score: 100 },
+  ]);
+  assert.deepEqual(names(rows), ['FIRST', 'SECOND', 'THIRD']);
+});
+
 test('topTen tolerates a missing list', () => {
   assert.deepEqual(topTen(undefined), []);
   assert.deepEqual(topTen(null), []);
@@ -76,9 +124,9 @@ test('topTen tolerates a missing list', () => {
 import { createLeaderboard } from '../js/services/leaderboard.js';
 
 function fakeBackend(rows = [], { onAdd } = {}) {
-  const calls = { top: 0, add: [] };
+  const calls = { top: 0, topLimit: 0, add: [] };
   const backend = {
-    async top(limit) { calls.top += 1; return rows.slice(0, limit); },
+    async top(limit) { calls.top += 1; calls.topLimit = limit; return rows.slice(0, limit); },
     async add(name, score) { calls.add.push({ name, score }); if (onAdd) await onAdd(name, score); },
   };
   return { backend, calls, loadBackend: async () => backend };
@@ -101,6 +149,20 @@ test('fetchTop10 maps the rows and keeps the score order', async () => {
     { name: 'AAA', score: 300 }, { name: 'BBB', score: 50 }, { name: 'CCC', score: 10 },
   ]);
   assert.equal(calls.top, 1);
+});
+
+test('fetchTop10 reads more rows than it shows, so ten distinct players survive', async () => {
+  // One player can own many of the highest rows; reading only ten of them could leave the
+  // table with a single name.
+  const rows = [];
+  for (let i = 0; i < 60; i++) rows.push({ name: i < 40 ? 'lein' : `p${i}`, score: 1000 - i });
+  const { loadBackend, calls } = fakeBackend(rows);
+  const lb = createLeaderboard({ loadBackend });
+  const shown = await lb.fetchTop10();
+  assert.equal(calls.topLimit, 50);
+  assert.equal(shown.length, 10);
+  assert.deepEqual(shown[0], { name: 'LEIN', score: 1000 });
+  assert.equal(new Set(shown.map((r) => r.name)).size, 10);
 });
 
 test('fetchTop10 rejects with offline when the backend cannot be loaded', async () => {

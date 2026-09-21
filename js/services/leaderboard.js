@@ -21,31 +21,48 @@ import { validateNick } from '../game/nick.js';
 const SDK = 'https://www.gstatic.com/firebasejs/12.19.0';
 const COLLECTION = 'scores';
 const LIMIT = 10;
+// How many documents a table view reads. The collection keeps every score ever submitted and
+// a client may not delete one, so a single player can own a long run of the highest rows;
+// reading only ten of them could leave a table with one name in it. Fifty is far more than
+// enough headroom for ten distinct players, and still nothing against the free tier's 50k
+// reads a day (a thousand views of the table).
+const READ_LIMIT = 50;
 const COOLDOWN_MS = 10_000;
 const TIMEOUT_MS = 8_000;       // a hanging request must show OFFLINE, not LOADING... forever
 
 /**
- * topTen(entries) -> [{ name, score }] — pure: drops malformed rows, sorts by score
- * descending keeping the earlier entry first on a tie, and trims to ten. Firestore already
- * returns the rows ordered and limited; running them through this keeps the table sane even
- * if a stray document ever slips past the rules.
+ * topTen(entries) -> [{ name, score }] — pure: drops malformed rows, keeps one row per
+ * player with their best score, sorts by score descending keeping the player who appeared
+ * earlier first on a tie, and trims to ten. Firestore already returns the rows ordered and
+ * limited; running them through this keeps the table sane even if a stray document ever
+ * slips past the rules.
  *
  * Every name is upper-cased here, the one place a row is normalised for display, so the
  * table reads like an arcade cabinet's — including the rows that were written in lower case
  * before `validateNick` started capitalising, which the create-only rules make unrewritable.
  * `toUpperCase` is locale-independent and the names are ASCII, so nothing else moves: the
- * sort and the tie-break still see the same scores in the same order.
+ * sort and the tie-break still see the same scores in the same order. It doubles as the
+ * case-insensitive key for the de-duplication, so `lein` and `LEIN` are the same player.
+ *
+ * The collection stores every score ever sent and a client cannot delete one, so a player
+ * owns as many rows as they have runs; the table is a list of players, not of runs, and it
+ * is built here because the data cannot be rewritten. The caller must therefore read more
+ * rows than it shows — see READ_LIMIT.
  */
 export function topTen(entries, limit = LIMIT) {
   if (!Array.isArray(entries)) return [];
-  const clean = [];
+  const best = new Map();
   for (const e of entries) {
     if (!e || typeof e !== 'object') continue;
     const name = typeof e.name === 'string' ? e.name.toUpperCase() : '';
     const score = Math.floor(Number(e.score));
     if (!name || !Number.isFinite(score)) continue;
-    clean.push({ name, score, order: clean.length });
+    const seen = best.get(name);
+    // A player's place in the tie-break is where their first row was, whichever run wins.
+    if (!seen) best.set(name, { name, score, order: best.size });
+    else if (score > seen.score) seen.score = score;
   }
+  const clean = [...best.values()];
   // Array.prototype.sort is stable, but the explicit tiebreak keeps the intent readable.
   clean.sort((a, b) => (b.score - a.score) || (a.order - b.order));
   return clean.slice(0, limit).map(({ name, score }) => ({ name, score }));
@@ -133,7 +150,8 @@ export function createLeaderboard({
   /** fetchTop10() -> Promise<{name,score}[]>; rejects with Error('offline'|'denied'). */
   async function fetchTop10() {
     try {
-      const rows = await withTimeout((async () => (await backend()).top(LIMIT))(), timeoutMs);
+      // READ_LIMIT rows in, ten players out: topTen() collapses a player's runs into one.
+      const rows = await withTimeout((async () => (await backend()).top(READ_LIMIT))(), timeoutMs);
       return topTen(rows);
     } catch (err) {
       backendPromise = null;    // a broken app/db handle must not be reused
